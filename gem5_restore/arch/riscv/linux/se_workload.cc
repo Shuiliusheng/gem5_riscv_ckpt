@@ -37,6 +37,8 @@
 #include "base/trace.hh"
 #include "cpu/thread_context.hh"
 #include "sim/syscall_emul.hh"
+#include "debug/ShowSyscall.hh"
+#include <stdio.h>
 
 namespace gem5
 {
@@ -87,6 +89,16 @@ EmuLinux::syscall(ThreadContext *tc)
     process->Process::syscall(tc);
 
     RegVal num = tc->readIntReg(RiscvISA::SyscallNumReg);
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) { 
+        RegVal a0 = tc->readIntReg(10);
+        RegVal a1 = tc->readIntReg(11);
+        RegVal a2 = tc->readIntReg(12);
+        RegVal a3 = tc->readIntReg(13);
+        RegVal a4 = tc->readIntReg(14);
+        DPRINTF(ShowSyscall, "{\"type\":\"syscall enter\", \"pc\": \"0x%llx\", \"sysnum\": \"0x%x\", \"param\": [ \"0x%llx\", \"0x%llx\", \"0x%llx\", \"0x%llx\", \"0x%llx\" ]}\n", tc->pcState().pc(), num, a0, a1, a2, a3, a4);
+        // printf("\"type\":\"syscall enter\", \"pc\": 0x%llx, \"sysnum\": %llu, \"param\": 0x%llx, a1: 0x%llx, a2: 0x%llx, a3: 0x%llx, a4: 0x%llx\n", tc->pcState().pc(), num, a0, a1, a2, a3, a4);
+    }
+
     if (dynamic_cast<RiscvProcess64 *>(process))
         syscallDescs64.get(num)->doSyscall(tc);
     else

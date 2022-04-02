@@ -59,10 +59,16 @@ class AtomicSimpleCPU : public BaseSimpleCPU
 
     void init() override;
 
+    unsigned long long tempregs[32];
+
+    bool startshow = false;
+    unsigned long long simInstNum = 0;
+
   protected:
     EventFunctionWrapper tickEvent;
 
     const int width;
+    const int ckptinsts;
     bool locked;
     const bool simulate_data_stalls;
     const bool simulate_inst_stalls;

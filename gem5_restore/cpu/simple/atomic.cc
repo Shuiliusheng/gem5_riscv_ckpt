@@ -49,6 +49,9 @@
 #include "debug/Drain.hh"
 #include "debug/ExecFaulting.hh"
 #include "debug/SimpleCPU.hh"
+#include "debug/ShowMemInfo.hh"
+#include "debug/ShowRegInfo.hh"
+#include "debug/ShowDetail.hh"
 #include "mem/packet.hh"
 #include "mem/packet_access.hh"
 #include "mem/physical.hh"
@@ -56,7 +59,7 @@
 #include "sim/faults.hh"
 #include "sim/full_system.hh"
 #include "sim/system.hh"
-
+#include <string.h>
 namespace gem5
 {
 
@@ -76,7 +79,7 @@ AtomicSimpleCPU::AtomicSimpleCPU(const AtomicSimpleCPUParams &p)
     : BaseSimpleCPU(p),
       tickEvent([this]{ tick(); }, "AtomicSimpleCPU tick",
                 false, Event::CPU_Tick_Pri),
-      width(p.width), locked(false),
+      width(p.width), locked(false), ckptinsts(p.ckptinsts), 
       simulate_data_stalls(p.simulate_data_stalls),
       simulate_inst_stalls(p.simulate_inst_stalls),
       icachePort(name() + ".icache_port", this),
@@ -421,6 +424,16 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t *data, unsigned size,
                 assert(!locked);
                 locked = true;
             }
+            if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo)) { 
+                unsigned long long res = 0;
+                switch(size){
+                    case 1: res = data[0]; break;
+                    case 2: res = data[0] + ((unsigned long long)data[1] << 8); break;
+                    case 4: res = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24); break;
+                    case 8: res = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24) + ((unsigned long long)data[4] <<32) + ((unsigned long long)data[5] << 40) + ((unsigned long long)data[6] << 48) + ((unsigned long long)data[7] << 56); break;
+                }
+                DPRINTF(ShowMemInfo, "{\"type\": \"mem_read\", \"pc\": \"0x%llx\", \"addr\": \"0x%llx\", \"size\": \"0x%x\", \"data\": \"0x%llx\"}\n", thread->pcState().pc(), addr, size, res);
+            }
             return fault;
         }
 
@@ -448,6 +461,16 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
         assert(flags & Request::STORE_NO_DATA);
         // This must be a cache block cleaning request
         data = zero_array;
+    }
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo)) { 
+        unsigned long long res1 = 0;
+        switch(size){
+            case 1: res1 = data[0]; break;
+            case 2: res1 = data[0] + ((unsigned long long)data[1] << 8); break;
+            case 4: res1 = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24); break;
+            case 8: res1 = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24) + ((unsigned long long)data[4] <<32) + ((unsigned long long)data[5] << 40) + ((unsigned long long)data[6] << 48) + ((unsigned long long)data[7] << 56); break;
+        }
+        DPRINTF(ShowMemInfo, "{\"type\": \"mem_write\", \"pc\": \"0x%llx\", \"addr\": \"0x%llx\", \"size\": \"0x%x\", \"data\": \"0x%llx\"}\n", thread->pcState().pc(), addr, size, res1);
     }
 
     // use the CPU's statically allocated write request and packet objects
@@ -604,6 +627,17 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
         return NoFault;
     }
 
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo)) { 
+        unsigned long long res1 = 0;
+        switch(size){
+            case 1: res1 = data[0]; break;
+            case 2: res1 = data[0] + ((unsigned long long)data[1] << 8); break;
+            case 4: res1 = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24); break;
+            case 8: res1 = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24) + ((unsigned long long)data[4] <<32) + ((unsigned long long)data[5] << 40) + ((unsigned long long)data[6] << 48) + ((unsigned long long)data[7] << 56); break;
+        }
+        DPRINTF(ShowMemInfo, "{\"type\": \"mem_atomic\", \"pc\": \"0x%llx\", \"addr\": \"0x%llx\", \"size\": \"0x%x\", \"data\": \"0x%llx\"}\n", thread->pcState().pc(), addr, size, res1);
+    }
+
     //If there's a fault and we're not doing prefetch, return it
     return fault;
 }
@@ -683,12 +717,74 @@ AtomicSimpleCPU::tick()
 
             Tick stall_ticks = 0;
             if (curStaticInst) {
+
+                bool ecall = false;
+                if(curStaticInst->numSrcRegs() == 2 && curStaticInst->numDestRegs() == 1 && curStaticInst->destRegIdx(0).index() == 0) {
+                    const std::string inst_str = curStaticInst->disassemble(thread->pcState().pc());                    
+                    RegId rs1 = curStaticInst->srcRegIdx(0);
+                    RegId rtemp = curStaticInst->srcRegIdx(1);
+                    if(inst_str.find("sub") != std::string::npos && inst_str.find("amo") == std::string::npos){
+                        tempregs[rtemp.index()] = thread->readIntReg(rs1.index());
+                        // printf("special inst: write 0x%lx (r%d) to rtemp %d \n", thread->readIntReg(rs1.index()), rs1.index(), rtemp.index());
+                    }
+                    else if(inst_str.find("add") != std::string::npos && inst_str.find("amo") == std::string::npos){
+                        thread->setIntReg(rs1.index(), tempregs[rtemp.index()]);
+                        // printf("special inst: read 0x%lx (rtemp %d) to r%d, \n", tempregs[rtemp.index()], rtemp.index(), rs1.index());
+                    }
+                    else if(inst_str.find("or") != std::string::npos && inst_str.find("amo") == std::string::npos){
+                        ecall = true;
+                    }
+                }
+
+                
+
+                if((GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowDetail)) && startshow){// 
+                    DPRINTF(ShowDetail, "--------------- pc: 0x%lx --------------- %d \n", thread->pcState().pc(), simInstNum);
+                    for(int i=0;i<curStaticInst->numSrcRegs();i++){
+                        RegId src = curStaticInst->srcRegIdx(i);
+                        DPRINTF(ShowDetail, "pc: 0x%lx, src %d: 0x%lx\n", thread->pcState().pc(), src.index(), thread->readIntReg(src.index()));
+                    }
+
+                    if (ecall || (simInstNum%500 == 0) ) {
+                        DPRINTF(ShowDetail, "simIntNum %d, int regs: \n", simInstNum);
+                        for(int i=0;i<31;i++){
+                            DPRINTF(ShowDetail, "r%d: 0x%lx\n", i, thread->readIntReg(i));
+                        }
+                    }
+                }
                 fault = curStaticInst->execute(&t_info, traceData);
 
                 // keep an instruction count
                 if (fault == NoFault) {
                     countInst();
+                    if (!curStaticInst->isMicroop() || curStaticInst->isLastMicroop()) {
+                        if (thread->pcState().pc() > 0x200000 && !ecall)
+                            simInstNum++;
+                    }
                     ppCommit->notify(std::make_pair(thread, curStaticInst));
+                    if((GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowDetail)) && startshow){//
+                        for(int i=0;i<curStaticInst->numDestRegs();i++){
+                            RegId dst = curStaticInst->destRegIdx(i);
+                            DPRINTF(ShowDetail, "pc: 0x%lx, dst %d: 0x%lx\n", thread->pcState().pc(), dst.index(), thread->readIntReg(dst.index()));
+                        }
+                    }
+
+
+                    if ((t_info.numInst % ckptinsts == 0) && (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowRegInfo))) {
+                        char str[3000];
+                        sprintf(str, "{\"type\": \"int_regs\", \"inst_num\": \"%d\", \"inst_pc\": \"0x%llx\", \"npc\": \"0x%llx\", \"data\": [ ", t_info.numInst, thread->pcState().pc(), thread->nextInstAddr());
+                        for(int i=0;i<31;i++){
+                            sprintf(str, "%s\"0x%llx\", ", str, thread->readIntReg(i));
+                        }
+                        DPRINTF(ShowRegInfo, "%s\"0x%llx\" ]}\n", str, thread->readIntReg(31));
+
+                        sprintf(str, "{\"type\": \"fp_regs\", \"inst_num\": \"%d\", \"inst_pc\": \"0x%llx\", \"npc\": \"0x%llx\", \"data\": [ ", t_info.numInst, thread->pcState().pc(), thread->nextInstAddr());
+                        for(int i=0;i<31;i++){
+                            sprintf(str, "%s\"0x%llx\", ", str, thread->readFloatReg(i));
+                        }
+                        DPRINTF(ShowRegInfo, "%s\"0x%llx\" ]}\n", str, thread->readFloatReg(31));
+                    }
+
                 } else if (traceData) {
                     traceFault();
                 }
@@ -727,6 +823,29 @@ AtomicSimpleCPU::tick()
         }
         if (fault != NoFault || !t_info.stayAtPC)
             advancePC(fault);
+
+        if (fault == NoFault && curStaticInst) {
+            if(curStaticInst->numSrcRegs() == 2 && curStaticInst->numDestRegs() == 1 && curStaticInst->destRegIdx(0).index() == 0) {
+                const std::string inst_str = curStaticInst->disassemble(thread->pcState().pc());
+                RegId rtemp = curStaticInst->srcRegIdx(1);
+                if(inst_str.find("or") != std::string::npos && inst_str.find("amo") == std::string::npos){
+                    TheISA::PCState pcState = thread->pcState();
+                    pcState.set(tempregs[rtemp.index()]);
+                    thread->pcState(pcState);
+                    // printf("jmp to 0x%lx (rtemp %d)\n", thread->pcState().pc(), rtemp.index());
+                    startshow = true;
+                }
+            }
+        }
+
+        if(fault == NoFault && simInstNum >= (ckptinsts+3) ) {
+            TheISA::PCState pcState = thread->pcState();
+            pcState.set(tempregs[6]);
+            thread->pcState(pcState);
+            printf("simInstNum: %d, exit and jmp to pc: 0x%lx (rtemp %d)\n", simInstNum, tempregs[6], 6);
+            simInstNum = 0;
+            startshow = false;
+        }
     }
 
     if (tryCompleteDrain())

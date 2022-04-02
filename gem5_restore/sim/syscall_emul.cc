@@ -288,6 +288,7 @@ SyscallReturn
 closeFunc(SyscallDesc *desc, ThreadContext *tc, int tgt_fd)
 {
     auto p = tc->getProcessPtr();
+    // printf("syscall close, pc: 0x%x, fd: 0x%x\n", tc->pcState().pc(), tgt_fd);
     return p->fds->closeFDEntry(tgt_fd);
 }
 

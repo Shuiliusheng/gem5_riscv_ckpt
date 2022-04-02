@@ -107,6 +107,7 @@
 #include "sim/syscall_desc.hh"
 #include "sim/syscall_emul_buf.hh"
 #include "sim/syscall_return.hh"
+#include "debug/ShowSyscall.hh"
 
 #if defined(__APPLE__) && defined(__MACH__) && !defined(CMSG_ALIGN)
 #define CMSG_ALIGN(len) (((len) + sizeof(size_t) - 1) & ~(sizeof(size_t) - 1))
@@ -897,6 +898,9 @@ openatFunc(SyscallDesc *desc, ThreadContext *tc,
     DPRINTF_SYSCALL(Verbose, "%s: sim_fd[%d], target_fd[%d] -> path:%s\n"
                     "(inferred from:%s)\n", desc->name(),
                     sim_fd, tgt_fd, used_path.c_str(), path.c_str());
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) { 
+        DPRINTF(ShowSyscall, "{\"type\":\"syscall info\", \"info\": \"open\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"filename\": \"%s\", \"flag\": \"0x%x\", \"mode\": \"0x%x\"}\n", tc->pcState().pc(), tgt_fd, path.c_str(), tgt_flags, mode);
+    }
     return tgt_fd;
 }
 
@@ -2434,6 +2438,16 @@ readFunc(SyscallDesc *desc, ThreadContext *tc,
 
     BufferArg buf_arg(buf_ptr, nbytes);
     int bytes_read = read(sim_fd, buf_arg.bufferPtr(), nbytes);
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) { 
+        char *str = (char *)malloc(1000+nbytes*8);
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"read\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), tgt_fd, (unsigned long long)buf_ptr, nbytes, bytes_read);
+        unsigned char *data1 = (unsigned char *)buf_arg.bufferPtr();
+        for(int i=0;i<nbytes-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, data1[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, data1[nbytes-1]);
+        free(str);
+    }
 
     if (bytes_read > 0)
         buf_arg.copyOut(tc->getVirtProxy());
@@ -2473,7 +2487,16 @@ writeFunc(SyscallDesc *desc, ThreadContext *tc,
     }
 
     int bytes_written = write(sim_fd, buf_arg.bufferPtr(), nbytes);
-
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) { 
+        char *str = (char *)malloc(1000+nbytes*8);
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"write\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), tgt_fd, (unsigned long long)buf_ptr, nbytes, bytes_written);
+        unsigned char *data1 = (unsigned char *)buf_arg.bufferPtr();
+        for(int i=0;i<nbytes-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, data1[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, data1[nbytes-1]);
+        free(str);
+    }
     if (bytes_written != -1)
         fsync(sim_fd);
 
