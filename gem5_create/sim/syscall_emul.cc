@@ -288,6 +288,7 @@ SyscallReturn
 closeFunc(SyscallDesc *desc, ThreadContext *tc, int tgt_fd)
 {
     auto p = tc->getProcessPtr();
+    // printf("syscall close, pc: 0x%x, fd: 0x%x\n", tc->pcState().pc(), tgt_fd);
     return p->fds->closeFDEntry(tgt_fd);
 }
 
@@ -394,6 +395,20 @@ getcwdFunc(SyscallDesc *desc, ThreadContext *tc,
 
     buf.copyOut(tc->getVirtProxy());
 
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+        unsigned outsize = size; 
+        unsigned char *outdata = (unsigned char *)(buf.bufferPtr());
+        unsigned long long dstaddr = (unsigned long long)buf_ptr;
+        unsigned long long res = result;
+        char *str = (char *)malloc(1000 + outsize*8); //tc->readIntReg(11)
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        for(int i=0;i<outsize-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        free(str);
+    }
+
     return (result == -1) ? -errno : result;
 }
 
@@ -451,6 +466,20 @@ readlinkFunc(SyscallDesc *desc, ThreadContext *tc,
     }
 
     buf.copyOut(tc->getVirtProxy());
+
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall) && result != -1) {
+        unsigned outsize = result; 
+        unsigned char *outdata = (unsigned char *)(buf.bufferPtr());
+        unsigned long long dstaddr = (unsigned long long)buf_ptr;
+        unsigned long long res = result;
+        char *str = (char *)malloc(1000 + outsize*8); //tc->readIntReg(11)
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        for(int i=0;i<outsize-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        free(str);
+    }
 
     return (result == -1) ? -errno : result;
 }

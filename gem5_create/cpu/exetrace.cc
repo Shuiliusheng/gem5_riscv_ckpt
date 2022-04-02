@@ -68,91 +68,126 @@ Trace::ExeTracerRecord::traceInst(const StaticInstPtr &inst, bool ran)
     if (!in_user_mode && !debug::ExecKernel)
         return;
 
-    if (debug::ExecAsid) {
-        outs << "A" << std::dec <<
-            thread->getIsaPtr()->getExecutingAsid() << " ";
-    }
-
-    if (debug::ExecThread)
-        outs << "T" << thread->threadId() << " : ";
-
     Addr cur_pc = pc.instAddr();
-    loader::SymbolTable::const_iterator it;
-    ccprintf(outs, "%#x", cur_pc);
-    if (debug::ExecSymbol && (!FullSystem || !in_user_mode) &&
-            (it = loader::debugSymbolTable.findNearest(cur_pc)) !=
-                loader::debugSymbolTable.end()) {
-        Addr delta = cur_pc - it->address;
-        if (delta)
-            ccprintf(outs, " @%s+%d", it->name, delta);
-        else
-            ccprintf(outs, " @%s", it->name);
+    if (ran && inst->isMemRef()) {
+        if(inst->isLoad()){
+            ccprintf(outs, "{\"type\": \"mem_read\", \"pc\": %#x, ", cur_pc);
+        }
+        if(inst->isAtomic()){
+            ccprintf(outs, "{\"type\": \"mem_atomic\", \"pc\": %#x, ", cur_pc);
+        }
+        if(inst->isStore()){
+            ccprintf(outs, "{\"type\": \"mem_write\", \"pc\": %#x, ", cur_pc);
+        }
+        if (debug::ExecEffAddr && getMemValid())
+            outs << "\"addr\": 0x" << std::hex << addr <<", ";
+
+        if (debug::ExecResult && data_status != DataInvalid) {
+            switch (data_status) {
+                case DataVec:
+                ccprintf(outs, "\"size\": %d, \"data\": [%s]}", size, *data.as_vec);
+                break;
+                case DataVecPred:
+                ccprintf(outs, "\"size\": %d, \"data\": [%s]}", size, *data.as_pred);
+                break;
+                default:
+                ccprintf(outs, "\"size\": %d, \"data\": %#018x}", size, data.as_int);
+                break;
+            }
+        }
+        outs << std::endl;
+        if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ExecEnable)) { 
+            printf("%s", outs.str().c_str());
+        }
+        // Trace::getDebugLogger()->dprintf_flag(when, thread->getCpuPtr()->name(), "ExecEnable", "%s", outs.str().c_str());
     }
 
-    if (inst->isMicroop()) {
-        ccprintf(outs, ".%2d", pc.microPC());
-    } else {
-        ccprintf(outs, "   ");
-    }
+    // if (debug::ExecAsid) {
+    //     outs << "A" << std::dec <<
+    //         thread->getIsaPtr()->getExecutingAsid() << " ";
+    // }
 
-    ccprintf(outs, " : ");
+    // if (debug::ExecThread)
+    //     outs << "T" << thread->threadId() << " : ";
+
+    // Addr cur_pc = pc.instAddr();
+    // loader::SymbolTable::const_iterator it;
+    // ccprintf(outs, "%#x", cur_pc);
+    // if (debug::ExecSymbol && (!FullSystem || !in_user_mode) &&
+    //         (it = loader::debugSymbolTable.findNearest(cur_pc)) !=
+    //             loader::debugSymbolTable.end()) {
+    //     Addr delta = cur_pc - it->address;
+    //     if (delta)
+    //         ccprintf(outs, " @%s+%d", it->name, delta);
+    //     else
+    //         ccprintf(outs, " @%s", it->name);
+    // }
+
+    // if (inst->isMicroop()) {
+    //     ccprintf(outs, ".%2d", pc.microPC());
+    // } else {
+    //     ccprintf(outs, "   ");
+    // }
+
+    // ccprintf(outs, " : ");
 
     //
     //  Print decoded instruction
     //
 
-    outs << std::setw(26) << std::left;
-    outs << inst->disassemble(cur_pc, &loader::debugSymbolTable);
+    // outs << std::setw(26) << std::left;
+    // outs << inst->disassemble(cur_pc, &loader::debugSymbolTable);
 
-    if (ran) {
-        outs << " : ";
+    // if (ran) {
+    //     outs << " : ";
 
-        if (debug::ExecOpClass) {
-            outs << enums::OpClassStrings[inst->opClass()] << " : ";
-        }
+    //     if (debug::ExecOpClass) {
+    //         outs << enums::OpClassStrings[inst->opClass()] << " : ";
+    //     }
 
-        if (debug::ExecResult && !predicate) {
-            outs << "Predicated False";
-        }
+    //     if (debug::ExecResult && !predicate) {
+    //         outs << "Predicated False";
+    //     }
 
-        if (debug::ExecResult && data_status != DataInvalid) {
-            switch (data_status) {
-              case DataVec:
-                ccprintf(outs, " D=%s", *data.as_vec);
-                break;
-              case DataVecPred:
-                ccprintf(outs, " D=%s", *data.as_pred);
-                break;
-              default:
-                ccprintf(outs, " D=%#018x", data.as_int);
-                break;
-            }
-        }
+    //     if (debug::ExecResult && data_status != DataInvalid) {
+    //         switch (data_status) {
+    //           case DataVec:
+    //             ccprintf(outs, " D=%s", *data.as_vec);
+    //             break;
+    //           case DataVecPred:
+    //             ccprintf(outs, " D=%s", *data.as_pred);
+    //             break;
+    //           default:
+    //             ccprintf(outs, " D=%#018x", data.as_int);
+    //             break;
+    //         }
+    //     }
 
-        if (debug::ExecEffAddr && getMemValid())
-            outs << " A=0x" << std::hex << addr;
+    //     if (debug::ExecEffAddr && getMemValid())
+    //         outs << " A=0x" << std::hex << addr;
 
-        if (debug::ExecFetchSeq && fetch_seq_valid)
-            outs << "  FetchSeq=" << std::dec << fetch_seq;
+    //     if (debug::ExecFetchSeq && fetch_seq_valid)
+    //         outs << "  FetchSeq=" << std::dec << fetch_seq;
 
-        if (debug::ExecCPSeq && cp_seq_valid)
-            outs << "  CPSeq=" << std::dec << cp_seq;
+    //     if (debug::ExecCPSeq && cp_seq_valid)
+    //         outs << "  CPSeq=" << std::dec << cp_seq;
 
-        if (debug::ExecFlags) {
-            outs << "  flags=(";
-            inst->printFlags(outs, "|");
-            outs << ")";
-        }
-    }
+    //     if (debug::ExecFlags) {
+    //         outs << "  flags=(";
+    //         inst->printFlags(outs, "|");
+    //         outs << ")";
+    //     }
+    // }
 
     //
     //  End of line...
     //
-    outs << std::endl;
+    // outs << std::endl;
 
-    Trace::getDebugLogger()->dprintf_flag(
-        when, thread->getCpuPtr()->name(), "ExecEnable", "%s",
-        outs.str().c_str());
+    // Trace::getDebugLogger()->dprintf_flag(
+    //     when, thread->getCpuPtr()->name(), "ExecEnable", "%s",
+    //     outs.str().c_str());
+
 }
 
 void

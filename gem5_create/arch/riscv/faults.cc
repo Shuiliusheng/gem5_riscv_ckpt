@@ -41,7 +41,7 @@
 #include "sim/debug.hh"
 #include "sim/full_system.hh"
 #include "sim/workload.hh"
-
+#include <stdio.h>
 namespace gem5
 {
 
@@ -204,6 +204,7 @@ BreakpointFault::invokeSE(ThreadContext *tc, const StaticInstPtr &inst)
 void
 SyscallFault::invokeSE(ThreadContext *tc, const StaticInstPtr &inst)
 {
+    // printf("SyscallFault invokeSE, pc: 0x%x,\n", tc->pcState().pc());
     tc->getSystemPtr()->workload->syscall(tc);
 }
 

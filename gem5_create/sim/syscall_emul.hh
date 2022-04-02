@@ -107,6 +107,7 @@
 #include "sim/syscall_desc.hh"
 #include "sim/syscall_emul_buf.hh"
 #include "sim/syscall_return.hh"
+#include "debug/ShowSyscall.hh"
 
 #if defined(__APPLE__) && defined(__MACH__) && !defined(CMSG_ALIGN)
 #define CMSG_ALIGN(len) (((len) + sizeof(size_t) - 1) & ~(sizeof(size_t) - 1))
@@ -560,6 +561,61 @@ getElapsedTimeNano(T1 &sec, T2 &nsec)
 //// Helper function to convert a host stat buffer to a target stat
 //// buffer.  Also copies the target buffer out to the simulated
 //// memory space.  Used by stat(), fstat(), and lstat().
+template <typename OS, typename TgtStatPtr, typename HostStatPtr>
+void
+copyOutStatBuf1(TgtStatPtr tgt, HostStatPtr host, bool fakeTTY=false)
+{
+    if (fakeTTY)
+        tgt->st_dev = 0xA;
+    else
+        tgt->st_dev = host->st_dev;
+    tgt->st_ino = host->st_ino;
+    tgt->st_mode = host->st_mode;
+    if (fakeTTY) {
+        // Claim to be a character device
+        tgt->st_mode &= ~S_IFMT;    // Clear S_IFMT
+        tgt->st_mode |= S_IFCHR;    // Set S_IFCHR
+    }
+    // printf("fstat, dev: 0x%lx, ino: 0x%lx, mode: 0x%lx\n", tgt->st_dev, tgt->st_ino, tgt->st_mode);
+    tgt->st_nlink = host->st_nlink;
+    tgt->st_uid = host->st_uid;
+    tgt->st_gid = host->st_gid;
+    if (fakeTTY)
+        tgt->st_rdev = 0x880d;
+    else
+        tgt->st_rdev = host->st_rdev;
+    // printf("fstat, nlink: 0x%lx, uid: 0x%lx, gid: 0x%lx, rdev: 0x%lx\n", tgt->st_nlink, tgt->st_uid, tgt->st_gid, tgt->st_rdev);
+    tgt->st_size = host->st_size;
+    tgt->st_atimeX = host->st_atime;
+    tgt->st_mtimeX = host->st_mtime;
+    tgt->st_ctimeX = host->st_ctime;
+    // Force the block size to be 8KB. This helps to ensure buffered io works
+    // consistently across different hosts.
+    tgt->st_blksize = 0x2000;
+    tgt->st_blocks = host->st_blocks;
+    // printf("fstat, size: 0x%lx, atx: 0x%lx, mtx: 0x%lx, ctx: 0x%lx, blksize: 0x%lx, blocks: 0x%x\n", tgt->st_size, tgt->st_atimeX, tgt->st_mtimeX, tgt->st_ctimeX, tgt->st_blksize, tgt->st_blocks);
+}
+
+// Same for stat64
+
+template <typename OS, typename TgtStatPtr, typename HostStatPtr>
+void
+copyOutStat64Buf1(TgtStatPtr tgt, HostStatPtr host,
+                 bool fakeTTY=false)
+{
+    copyOutStatBuf1<OS>(tgt, host, fakeTTY);
+    // DPRINTF(ShowSyscall, "copyOutStat64Buf: 0x%lx, 0x%lx, size: %d\n", (unsigned long long)&tgt->st_dev, host, sizeof(host));
+#if defined(STAT_HAVE_NSEC)
+    tgt->st_atime_nsec = host->st_atime_nsec;
+    tgt->st_mtime_nsec = host->st_mtime_nsec;
+    tgt->st_ctime_nsec = host->st_ctime_nsec;
+    // printf("fstat atime: 0x%lx, mtime: 0x%lx, ctime: 0x%lx\n", host->st_atime_nsec, host->st_mtime_nsec, host->st_ctime_nsec);
+#else
+    tgt->st_atime_nsec = 0;
+    tgt->st_mtime_nsec = 0;
+    tgt->st_ctime_nsec = 0;
+#endif
+}
 
 template <typename OS, typename TgtStatPtr, typename HostStatPtr>
 void
@@ -616,6 +672,7 @@ copyOutStat64Buf(TgtStatPtr tgt, HostStatPtr host,
                  bool fakeTTY=false)
 {
     copyOutStatBuf<OS>(tgt, host, fakeTTY);
+    // DPRINTF(ShowSyscall, "copyOutStat64Buf: 0x%lx, 0x%lx, size: %d\n", (unsigned long long)&tgt->st_dev, host, sizeof(host));
 #if defined(STAT_HAVE_NSEC)
     constexpr ByteOrder bo = OS::byteOrder;
 
@@ -629,6 +686,44 @@ copyOutStat64Buf(TgtStatPtr tgt, HostStatPtr host,
     tgt->st_atime_nsec = 0;
     tgt->st_mtime_nsec = 0;
     tgt->st_ctime_nsec = 0;
+#endif
+}
+
+template <class OS, typename TgtStatPtr, typename HostStatPtr>
+void
+copyOutStatfsBuf1(TgtStatPtr tgt, HostStatPtr host)
+{
+    tgt->f_type = host->f_type;
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
+    tgt->f_bsize = host->f_iosize;
+#else
+    tgt->f_bsize = host->f_bsize;
+#endif
+    tgt->f_blocks = host->f_blocks;
+    tgt->f_bfree = host->f_bfree;
+    tgt->f_bavail = host->f_bavail;
+    tgt->f_files = host->f_files;
+    tgt->f_ffree = host->f_ffree;
+    memcpy(&tgt->f_fsid, &host->f_fsid, sizeof(host->f_fsid));
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
+    tgt->f_namelen = host->f_namemax;
+    tgt->f_frsize = host->f_bsize;
+#elif defined(__APPLE__)
+    tgt->f_namelen = 0;
+    tgt->f_frsize = 0;
+#else
+    tgt->f_namelen = host->f_namelen;
+    tgt->f_frsize = host->f_frsize;
+#endif
+#if defined(__linux__)
+    memcpy(&tgt->f_spare, &host->f_spare,
+            std::min(sizeof(host->f_spare), sizeof(tgt->f_spare)));
+#else
+    /*
+     * The fields are different sizes per OS. Don't bother with
+     * f_spare or f_reserved on non-Linux for now.
+     */
+    memset(&tgt->f_spare, 0, sizeof(tgt->f_spare));
 #endif
 }
 
@@ -897,6 +992,9 @@ openatFunc(SyscallDesc *desc, ThreadContext *tc,
     DPRINTF_SYSCALL(Verbose, "%s: sim_fd[%d], target_fd[%d] -> path:%s\n"
                     "(inferred from:%s)\n", desc->name(),
                     sim_fd, tgt_fd, used_path.c_str(), path.c_str());
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) { 
+        DPRINTF(ShowSyscall, "{\"type\":\"syscall info\", \"info\": \"open\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"filename\": \"%s\", \"flag\": \"0x%x\", \"mode\": \"0x%x\"}\n", tc->pcState().pc(), tgt_fd, path.c_str(), tgt_flags, mode);
+    }
     return tgt_fd;
 }
 
@@ -1229,6 +1327,21 @@ stat64Func(SyscallDesc *desc, ThreadContext *tc,
         return -errno;
 
     copyOutStat64Buf<OS>(tgt_stat, &hostBuf);
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+        typename OS::tgt_stat64 temp_stat;
+        copyOutStat64Buf1<OS>(&temp_stat, &hostBuf);
+        unsigned outsize = sizeof(temp_stat); 
+        unsigned char *outdata = (unsigned char *)(&temp_stat);
+        unsigned long long dstaddr = tc->readIntReg(11);
+        unsigned long long res = result;
+        char *str = (char *)malloc(1000 + outsize*8); //
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        for(int i=0;i<outsize-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        free(str);
+    }
 
     return 0;
 }
@@ -1256,7 +1369,7 @@ fstatat64Func(SyscallDesc *desc, ThreadContext *tc,
     struct stat  hostBuf;
     int result = stat(path.c_str(), &hostBuf);
 #else
-    struct stat64 hostBuf;
+    struct stat64 hostBuf, host;
     int result = stat64(path.c_str(), &hostBuf);
 #endif
 
@@ -1264,6 +1377,22 @@ fstatat64Func(SyscallDesc *desc, ThreadContext *tc,
         return -errno;
 
     copyOutStat64Buf<OS>(tgt_stat, &hostBuf);
+
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+        typename OS::tgt_stat64 temp_stat;
+        copyOutStat64Buf1<OS>(&temp_stat, &hostBuf);
+        unsigned outsize = sizeof(temp_stat); 
+        unsigned char *outdata = (unsigned char *)(&temp_stat);
+        unsigned long long dstaddr = tc->readIntReg(12);
+        unsigned long long res = result;
+        char *str = (char *)malloc(1000 + outsize*8); //
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        for(int i=0;i<outsize-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        free(str);
+    }
 
     return 0;
 }
@@ -1294,6 +1423,20 @@ fstat64Func(SyscallDesc *desc, ThreadContext *tc,
         return -errno;
 
     copyOutStat64Buf<OS>(tgt_stat, &hostBuf, (sim_fd == 1));
+
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+        typename OS::tgt_stat64 temp_stat;
+        copyOutStat64Buf1<OS>(&temp_stat, &hostBuf, (sim_fd == 1));
+        unsigned outsize = sizeof(temp_stat); 
+        unsigned char *outdata = (unsigned char *)(&temp_stat);
+        char *str = (char *)malloc(1000 + outsize*8);
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), tc->readIntReg(11), outsize, 0);
+        for(int i=0;i<outsize-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        free(str);
+    }
 
     return 0;
 }
@@ -1353,6 +1496,22 @@ lstat64Func(SyscallDesc *desc, ThreadContext *tc,
 
     copyOutStat64Buf<OS>(tgt_stat, &hostBuf);
 
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+        typename OS::tgt_stat64 temp_stat;
+        copyOutStat64Buf1<OS>(&temp_stat, &hostBuf);
+        unsigned outsize = sizeof(temp_stat); 
+        unsigned char *outdata = (unsigned char *)(&temp_stat);
+        unsigned long long dstaddr = tc->readIntReg(11);
+        unsigned long long res = result;
+        char *str = (char *)malloc(1000 + outsize*8); //
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        for(int i=0;i<outsize-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        free(str);
+    }
+
     return 0;
 }
 
@@ -1405,6 +1564,23 @@ statfsFunc(SyscallDesc *desc, ThreadContext *tc,
         return -errno;
 
     copyOutStatfsBuf<OS>(tgt_stat, &hostBuf);
+
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+        typename OS::tgt_statfs temp_stat;
+        copyOutStatfsBuf1<OS>(&temp_stat, &hostBuf);
+        unsigned outsize = sizeof(temp_stat); 
+        unsigned char *outdata = (unsigned char *)(&temp_stat);
+        unsigned long long dstaddr = tc->readIntReg(11);
+        unsigned long long res = 0;
+        char *str = (char *)malloc(1000 + outsize*8); //
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        for(int i=0;i<outsize-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        free(str);
+    }
+
     return 0;
 #else
     warnUnsupportedOS("statfs");
@@ -1557,6 +1733,22 @@ fstatfsFunc(SyscallDesc *desc, ThreadContext *tc,
         return -errno;
 
     copyOutStatfsBuf<OS>(tgt_stat, &hostBuf);
+
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+        typename OS::tgt_statfs temp_stat;
+        copyOutStatfsBuf1<OS>(&temp_stat, &hostBuf);
+        unsigned outsize = sizeof(temp_stat); 
+        unsigned char *outdata = (unsigned char *)(&temp_stat);
+        unsigned long long dstaddr = tc->readIntReg(11);
+        unsigned long long res = 0;
+        char *str = (char *)malloc(1000 + outsize*8); //
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        for(int i=0;i<outsize-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        free(str);
+    }
 
     return 0;
 }
@@ -1835,12 +2027,15 @@ getrlimitFunc(SyscallDesc *desc, ThreadContext *tc,
               unsigned resource, VPtr<typename OS::rlimit> rlp)
 {
     const ByteOrder bo = OS::byteOrder;
+    typename OS::rlimit rlp_temp;
+
     switch (resource) {
       case OS::TGT_RLIMIT_STACK:
         // max stack size in bytes: make up a number (8MiB for now)
         rlp->rlim_cur = rlp->rlim_max = 8 * 1024 * 1024;
         rlp->rlim_cur = htog(rlp->rlim_cur, bo);
         rlp->rlim_max = htog(rlp->rlim_max, bo);
+        rlp_temp.rlim_cur = rlp_temp.rlim_max = 8 * 1024 * 1024;
         break;
 
       case OS::TGT_RLIMIT_DATA:
@@ -1848,9 +2043,11 @@ getrlimitFunc(SyscallDesc *desc, ThreadContext *tc,
         rlp->rlim_cur = rlp->rlim_max = 256 * 1024 * 1024;
         rlp->rlim_cur = htog(rlp->rlim_cur, bo);
         rlp->rlim_max = htog(rlp->rlim_max, bo);
+        rlp_temp.rlim_cur = rlp_temp.rlim_max = 256 * 1024 * 1024;
         break;
 
       case OS::TGT_RLIMIT_NPROC:
+        rlp_temp.rlim_cur = rlp_temp.rlim_max = tc->getSystemPtr()->threads.size();
         rlp->rlim_cur = rlp->rlim_max = tc->getSystemPtr()->threads.size();
         rlp->rlim_cur = htog(rlp->rlim_cur, bo);
         rlp->rlim_max = htog(rlp->rlim_max, bo);
@@ -1860,6 +2057,20 @@ getrlimitFunc(SyscallDesc *desc, ThreadContext *tc,
         warn("getrlimit: unimplemented resource %d", resource);
         return -EINVAL;
         break;
+    }
+
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+        unsigned outsize = sizeof(rlp_temp); 
+        unsigned char *outdata = (unsigned char *)(&rlp_temp);
+        unsigned long long dstaddr = tc->readIntReg(11);
+        unsigned long long res = 0;
+        char *str = (char *)malloc(1000 + outsize*8); //
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        for(int i=0;i<outsize-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        free(str);
     }
 
     return 0;
@@ -1877,16 +2088,19 @@ prlimitFunc(SyscallDesc *desc, ThreadContext *tc,
     if (n)
         warn("prlimit: ignoring new rlimit");
     if (rlp) {
+        typename OS::rlimit rlp_temp;
         const ByteOrder bo = OS::byteOrder;
         switch (resource) {
           case OS::TGT_RLIMIT_STACK:
             // max stack size in bytes: make up a number (8MiB for now)
+            rlp_temp.rlim_cur = rlp_temp.rlim_max = 8 * 1024 * 1024;
             rlp->rlim_cur = rlp->rlim_max = 8 * 1024 * 1024;
             rlp->rlim_cur = htog(rlp->rlim_cur, bo);
             rlp->rlim_max = htog(rlp->rlim_max, bo);
             break;
           case OS::TGT_RLIMIT_DATA:
             // max data segment size in bytes: make up a number
+            rlp_temp.rlim_cur = rlp_temp.rlim_max = 256 * 1024 * 1024;
             rlp->rlim_cur = rlp->rlim_max = 256*1024*1024;
             rlp->rlim_cur = htog(rlp->rlim_cur, bo);
             rlp->rlim_max = htog(rlp->rlim_max, bo);
@@ -1895,6 +2109,20 @@ prlimitFunc(SyscallDesc *desc, ThreadContext *tc,
             warn("prlimit: unimplemented resource %d", resource);
             return -EINVAL;
             break;
+        }
+
+        if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+            unsigned outsize = sizeof(rlp_temp); 
+            unsigned char *outdata = (unsigned char *)(&rlp_temp);
+            unsigned long long dstaddr = tc->readIntReg(13);
+            unsigned long long res = 0;
+            char *str = (char *)malloc(1000 + outsize*8); //
+            sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+            for(int i=0;i<outsize-1;i++){
+                sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+            }
+            DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+            free(str);
         }
     }
     return 0;
@@ -1911,6 +2139,23 @@ clock_gettimeFunc(SyscallDesc *desc, ThreadContext *tc,
     tp->tv_sec = htog(tp->tv_sec, OS::byteOrder);
     tp->tv_nsec = htog(tp->tv_nsec, OS::byteOrder);
 
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+        typename OS::timespec tp_temp;
+        getElapsedTimeNano(tp_temp.tv_sec, tp_temp.tv_nsec);
+        tp_temp.tv_sec += seconds_since_epoch;
+        unsigned outsize = sizeof(tp_temp); 
+        unsigned char *outdata = (unsigned char *)(&tp_temp);
+        unsigned long long dstaddr = tc->readIntReg(11);
+        unsigned long long res = 0;
+        char *str = (char *)malloc(1000 + outsize*8); //
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        for(int i=0;i<outsize-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        free(str);
+    }
+
     return 0;
 }
 
@@ -1923,6 +2168,23 @@ clock_getresFunc(SyscallDesc *desc, ThreadContext *tc, int clk_id,
     // Set resolution at ns, which is what clock_gettime() returns
     tp->tv_sec = 0;
     tp->tv_nsec = 1;
+
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+        typename OS::timespec tp_temp;
+        tp_temp.tv_nsec = 1;
+        tp_temp.tv_sec = 0;
+        unsigned outsize = sizeof(tp_temp); 
+        unsigned char *outdata = (unsigned char *)(&tp_temp);
+        unsigned long long dstaddr = tc->readIntReg(11);
+        unsigned long long res = 0;
+        char *str = (char *)malloc(1000 + outsize*8); //
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        for(int i=0;i<outsize-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        free(str);
+    }
 
     return 0;
 }
@@ -1937,6 +2199,24 @@ gettimeofdayFunc(SyscallDesc *desc, ThreadContext *tc,
     tp->tv_sec += seconds_since_epoch;
     tp->tv_sec = htog(tp->tv_sec, OS::byteOrder);
     tp->tv_usec = htog(tp->tv_usec, OS::byteOrder);
+
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+        typename OS::timeval tp_temp;
+        getElapsedTimeMicro(tp_temp.tv_sec, tp_temp.tv_usec);
+        tp_temp.tv_sec += seconds_since_epoch;
+
+        unsigned outsize = sizeof(tp_temp); 
+        unsigned char *outdata = (unsigned char *)(&tp_temp);
+        unsigned long long dstaddr = tc->readIntReg(10);
+        unsigned long long res = 0;
+        char *str = (char *)malloc(1000 + outsize*8); //
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        for(int i=0;i<outsize-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        free(str);
+    }
 
     return 0;
 }
@@ -2126,6 +2406,12 @@ timesFunc(SyscallDesc *desc, ThreadContext *tc, VPtr<typename OS::tms> bufp)
 {
     // Fill in the time structure (in clocks)
     int64_t clocks = curTick() * OS::M5_SC_CLK_TCK / sim_clock::as_int::s;
+    typename OS::tms temp;
+    temp.tms_utime = clocks;
+    temp.tms_stime = 0;
+    temp.tms_cutime = 0;
+    temp.tms_cstime = 0;
+
     bufp->tms_utime = clocks;
     bufp->tms_stime = 0;
     bufp->tms_cutime = 0;
@@ -2133,6 +2419,21 @@ timesFunc(SyscallDesc *desc, ThreadContext *tc, VPtr<typename OS::tms> bufp)
 
     // Convert to host endianness
     bufp->tms_utime = htog(bufp->tms_utime, OS::byteOrder);
+
+    
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+        unsigned outsize = sizeof(temp); 
+        unsigned char *outdata = (unsigned char *)(&temp);
+        unsigned long long dstaddr = tc->readIntReg(10);
+        unsigned long long res = clocks;
+        char *str = (char *)malloc(1000 + outsize*8); //
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        for(int i=0;i<outsize-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        free(str);
+    }
 
     // Return clock ticks since system boot
     return clocks;
@@ -2153,6 +2454,21 @@ timeFunc(SyscallDesc *desc, ThreadContext *tc, VPtr<> taddr)
         PortProxy &p = tc->getVirtProxy();
         p.writeBlob(taddr, &t, (int)sizeof(typename OS::time_t));
     }
+
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+        unsigned outsize = sizeof(typename OS::time_t); 
+        unsigned char *outdata = (unsigned char *)(&sec);
+        unsigned long long dstaddr = tc->readIntReg(10);
+        unsigned long long res = sec;
+        char *str = (char *)malloc(1000 + outsize*8); //
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        for(int i=0;i<outsize-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        free(str);
+    }
+
     return sec;
 }
 
@@ -2434,6 +2750,16 @@ readFunc(SyscallDesc *desc, ThreadContext *tc,
 
     BufferArg buf_arg(buf_ptr, nbytes);
     int bytes_read = read(sim_fd, buf_arg.bufferPtr(), nbytes);
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) { 
+        char *str = (char *)malloc(1000+nbytes*8);
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"read\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), tgt_fd, (unsigned long long)buf_ptr, nbytes, bytes_read);
+        unsigned char *data1 = (unsigned char *)buf_arg.bufferPtr();
+        for(int i=0;i<nbytes-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, data1[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, data1[nbytes-1]);
+        free(str);
+    }
 
     if (bytes_read > 0)
         buf_arg.copyOut(tc->getVirtProxy());
@@ -2473,7 +2799,16 @@ writeFunc(SyscallDesc *desc, ThreadContext *tc,
     }
 
     int bytes_written = write(sim_fd, buf_arg.bufferPtr(), nbytes);
-
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) { 
+        char *str = (char *)malloc(1000+nbytes*8);
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"write\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), tgt_fd, (unsigned long long)buf_ptr, nbytes, bytes_written);
+        unsigned char *data1 = (unsigned char *)buf_arg.bufferPtr();
+        for(int i=0;i<nbytes-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, data1[i]);
+        }
+        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, data1[nbytes-1]);
+        free(str);
+    }
     if (bytes_written != -1)
         fsync(sim_fd);
 
