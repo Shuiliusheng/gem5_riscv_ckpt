@@ -13,7 +13,8 @@ class SyscallInfo:
     hasret = False
     ret = ""
     data = []
-    def __init__(self, pc = "", num = "", name = "", params = [], hasret=False, ret="", data = []):
+    bufaddr = ""
+    def __init__(self, pc = "", num = "", name = "", params = [], hasret=False, ret="", data = [], bufaddr = ""):
         self.pc = pc
         self.num = num
         self.name = name
@@ -21,14 +22,15 @@ class SyscallInfo:
         self.hasret = hasret
         self.ret = ret
         self.data = data
+        self.bufaddr = bufaddr
 
     def show(self):
-        print("sysinfo: " + self.num + " (" + self.name + "), pc: " + self.pc + ", ret: " + self.ret + ", data: " , len(self.data))
+        print("sysinfo: " + self.num + " (" + self.name + "), pc: " + self.pc + ", ret: " + self.ret + ", bufaddr: " + self.bufaddr + ", data: " , len(self.data))
         print("\t params: ", self.params)
         print("\t data: ", self.data)
 
     def show1(self):
-        print("sysinfo: " + self.pc, self.num, self.params[0], self.params[1], self.params[2], self.hasret, self.ret, len(self.data))
+        print("sysinfo: " + self.pc, self.num, self.name, self.params[0], self.params[1], self.params[2], self.hasret, self.ret, self.buffaddr, len(self.data))
         print("\t data: ", self.data)
 
 class StartPoint:
@@ -56,6 +58,25 @@ class StartPoint:
         #     print("fp reg ", idx, ": " , int(self.fpdata[idx], 16))
         #     idx = idx + 1
     
+class Memdata:
+    addr = 0
+    data = 0
+    size = 0
+    def __init__(self, addr = 0, data = 0, size = 0):
+        self.addr = addr
+        self.data = data
+        self.size = size
+
+    def show(self):
+        print('addr: 0x%x'%self.addr, ", data: 0x%x"%self.data, ", size: 0x%x"%self.size)
+
+def getaddr(load):
+    return load.addr
+
+def toBytes(val, size):
+    bs = val.to_bytes(length=size, byteorder='little', signed=False)
+    return bs
+
 
 def processRegInfo(reginfo):
     intreg = json.loads(reginfo[0])
@@ -93,7 +114,11 @@ def processSyscall(syscallinfo):
                 data = line1['data']
             
             hasret = line2['res'] == "has ret"
-            sinfo = SyscallInfo(enter['pc'], enter['sysnum'], line2['sysname'], enter['param'], hasret, line2['val'], data)
+            print(line1)
+            bufaddr = "0x0"
+            if ( 'buf' in line1 ): 
+                bufaddr = line1['buf']
+            sinfo = SyscallInfo(enter['pc'], enter['sysnum'], line2['sysname'], enter['param'], hasret, line2['val'], data, bufaddr)
             syscallinfos.append(sinfo)
             idx = idx + 2
 
@@ -103,28 +128,13 @@ def processSyscall(syscallinfo):
                 print(line1)
                 break
             hasret = line1['res'] == "has ret"
-            sinfo = SyscallInfo(enter['pc'], enter['sysnum'], line1['sysname'], enter['param'], hasret, line1['val'], [])
+            sinfo = SyscallInfo(enter['pc'], enter['sysnum'], line1['sysname'], enter['param'], hasret, line1['val'], [], "0x0")
             syscallinfos.append(sinfo)
             idx = idx + 1
 
         idx = idx + 1
     return syscallinfos
 
-
-class Memdata:
-    addr = 0
-    data = 0
-    size = 0
-    def __init__(self, addr = 0, data = 0, size = 0):
-        self.addr = addr
-        self.data = data
-        self.size = size
-
-    def show(self):
-        print('addr: 0x%x'%self.addr, ", data: 0x%x"%self.data, ", size: 0x%x"%self.size)
-
-def getaddr(load):
-    return load.addr
 
 def depart_data(value, size):
     idx = 0
@@ -302,10 +312,6 @@ def readfile(filename):
             reginfo.append(line)
     file.close()
 
-def toBytes(val, size):
-    bs = val.to_bytes(length=size, byteorder='little', signed=False)
-    return bs
-
 def writefile(startpoint, syscallinfos, loadinfo, memrange, end):
     ckptname = "ckpt_"+str(startpoint.inst_num)+"_"+str(end)+".info"
     syscallname = "ckpt_syscall_"+str(startpoint.inst_num)+"_"+str(end)+".info"
@@ -334,7 +340,7 @@ def writefile(startpoint, syscallinfos, loadinfo, memrange, end):
 
     f1.close()
 
-    data_addr = 9*8*len(syscallinfos) + 8
+    data_addr = 10*8*len(syscallinfos) + 8
     invalid_addr = 0xffffffff
     f2 = open(syscallname, 'wb')
     #write syscall information
@@ -350,6 +356,7 @@ def writefile(startpoint, syscallinfos, loadinfo, memrange, end):
         else:
             f2.write(toBytes(0, 8))
         f2.write(toBytes(int(syscall.ret,16), 8))
+        f2.write(toBytes(int(syscall.bufaddr,16), 8))
         data_size = len(syscall.data)
         if data_size == 0:
             f2.write(toBytes(invalid_addr, 8))

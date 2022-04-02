@@ -63,7 +63,7 @@ typedef struct{
     uint64_t num;
     uint64_t p0, p1, p2;
     uint64_t hasret, ret;
-    uint64_t data_offset, data_size;
+    uint64_t bufaddr, data_offset, data_size;
 }SyscallInfo;
 
 typedef struct{
@@ -242,31 +242,13 @@ void takeoverSyscall()
             printf("\n");
         }
         else{
-            unsigned char *dst = NULL;
-
-            if(infos.num == 0x50 || infos.num == 1038 || infos.num == 1049 || infos.num == 80 || infos.num == 1051 || infos.num == 1039 || infos.num == 1050 || infos.num == 43 || infos.num == 1056 || infos.num == 44 || infos.num == 1055 || infos.num == 163 || infos.num == 113 || infos.num == 114 || infos.num == 1035 ) { //copy data to p1
-                //stat: 1038 1049, fstat: 80 1051, lstat: 1039 1050, statfs: 43 1056
-                //fstatfs: 44 1055, getrlimit: 163, clock_gettime: 113, clock_getres: 114, readlink: 1035
-                dst = (unsigned char *)runinfo->intregs[11];
-            }
-            else if(infos.num == 169 || infos.num == 17 || infos.num == 1062 || infos.num == 153) { //copy data to p0
-                //gettimeofday: 169, getcwd: 17, time: 1062, time3: 153
-                dst = (unsigned char *)runinfo->intregs[10];
-            }
-            else if(infos.num == 79) { //copy data to p2
-                //fstatat: 79
-                dst = (unsigned char *)runinfo->intregs[12];
-            }
-            else if(infos.num == 261) { //copy data to p3
-                //prlimit64: 261
-                dst = (unsigned char *)runinfo->intregs[13];
-            }
+            unsigned char *dst = (unsigned char *)infos.bufaddr;
             unsigned char *data = (unsigned char *)(saddr + infos.data_offset);
             for(int c=0;c<infos.data_size;c++){
                 dst[c] = data[c];
             }
             if(ShowLog){
-                printf("p0-p2: 0x%lx, 0x%lx, 0x%lx; record p0-p2: 0x%lx, 0x%lx, 0x%lx\n", runinfo->intregs[10], runinfo->intregs[11], runinfo->intregs[12], infos.p0, infos.p1, infos.p2);
+                printf("p0-p2: 0x%lx, 0x%lx, 0x%lx; record p0-p2: 0x%lx, 0x%lx, 0x%lx, 0x%lx(bufaddr)\n", runinfo->intregs[10], runinfo->intregs[11], runinfo->intregs[12], infos.p0, infos.p1, infos.p2, infos.bufaddr);
             }
         }
     }
