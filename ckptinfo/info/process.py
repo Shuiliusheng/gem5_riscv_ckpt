@@ -26,11 +26,11 @@ class SyscallInfo:
 
     def show(self):
         print("sysinfo: " + self.num + " (" + self.name + "), pc: " + self.pc + ", ret: " + self.ret + ", bufaddr: " + self.bufaddr + ", data: " , len(self.data))
-        print("\t params: ", self.params)
-        print("\t data: ", self.data)
+        # print("\t params: ", self.params)
+        # print("\t data: ", self.data)
 
     def show1(self):
-        print("sysinfo: " + self.pc, self.num, self.name, self.params[0], self.params[1], self.params[2], self.hasret, self.ret, self.buffaddr, len(self.data))
+        print("sysinfo: " + self.pc, self.num, self.name, self.params[0], self.params[1], self.params[2], self.hasret, self.ret, self.bufaddr, len(self.data))
         print("\t data: ", self.data)
 
 class StartPoint:
@@ -114,7 +114,6 @@ def processSyscall(syscallinfo):
                 data = line1['data']
             
             hasret = line2['res'] == "has ret"
-            print(line1)
             bufaddr = "0x0"
             if ( 'buf' in line1 ): 
                 bufaddr = line1['buf']
@@ -182,6 +181,7 @@ def getLoadInfo(meminfo):
     preload = set()
     prestore = set()
     idx = 0
+    # use two set to record previous store and load
     while idx < len(meminfo):
         line = json.loads(meminfo[idx])
         if line['type'] == "mem_read" or line['type'] == "mem_atomic":
@@ -208,15 +208,18 @@ def getLoadInfo(meminfo):
         idx = idx + 1
     
     loadinfo.sort(key = getaddr)
+    # the access size of raw loadinfo is byte, so combine consecutive bytes to one access 
     loadinfo = combine(loadinfo)
     return loadinfo
 
 # get the load store access range in memory with 4KB step
-def getMemRange(meminfo):
+def getMemRange(meminfo, syscallinfos):
     infos = []
     res = []
     addrset = set()
     idx = 0
+
+    #add load and store information
     while idx < len(meminfo):
         line = json.loads(meminfo[idx])
         saddr = int(line['addr'], 16)
@@ -230,8 +233,23 @@ def getMemRange(meminfo):
             idx1 = idx1 + 1
         idx = idx + 1
     
+    #add syscall memory access information
+    for info in syscallinfos:
+        if len(info.data) == 0:
+            continue
+        saddr = int(info.bufaddr, 16)
+        size = len(info.data)
+        idx1 = 0
+        while idx1 < size:
+            val = saddr + idx1
+            if val not in addrset:
+                addrset.add(val)
+                infos.append(val)
+            idx1 = idx1 + 1
+
     idx = 0
     infos.sort()
+    #try 4KB range to cover memory access addresses
     while idx < len(infos):
         saddr = (infos[idx] >> 12) << 12
         eaddr = saddr + 4096
@@ -246,6 +264,7 @@ def getMemRange(meminfo):
 
     idx = 0
     memrange = []
+    # combine consecutive 4KB range to one range
     while idx < len(res):
         saddr = res[idx].addr
         idx1 = idx + 1
@@ -261,14 +280,13 @@ def process(end, reginfo, meminfo, syscallinfo):
     startpoint = processRegInfo(reginfo)
     syscallinfos = processSyscall(syscallinfo)
     loadinfo = getLoadInfo(meminfo)
-    memrange = getMemRange(meminfo)
+    memrange = getMemRange(meminfo, syscallinfos)
     writefile(startpoint, syscallinfos, loadinfo, memrange, end)
     startpoint.show()
     for syscall in syscallinfos:
         syscall.show()
     for mem in memrange:
         mem.show()
-    os.system("pause")
     
 
 def readfile(filename):
