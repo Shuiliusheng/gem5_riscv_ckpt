@@ -114,6 +114,8 @@ def addNoISAOptions(parser):
                       speed""")
     # temp config
     parser.add_argument("--ckptinsts", type=int, default=10000)
+    parser.add_argument("--stackbase", type=int, default=0x7FFFFFFF)
+    parser.add_argument("--mmapend", type=int, default=0x41000000)
 
     # Memory Options
     parser.add_argument("--list-mem-types",

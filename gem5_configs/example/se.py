@@ -105,6 +105,12 @@ def get_processes(args):
         if len(errouts) > idx:
             process.errout = errouts[idx]
 
+        print(sys.argv)
+        if '--stackbase' in str(sys.argv):
+            process.stackbase = args.stackbase
+        if '--mmapend' in str(sys.argv):
+            process.mmapend = args.mmapend
+
         multiprocesses.append(process)
         idx += 1
 

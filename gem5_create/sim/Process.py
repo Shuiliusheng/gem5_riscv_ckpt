@@ -63,6 +63,10 @@ class Process(SimObject):
     drivers = VectorParam.EmulatedDriver([], 'Available emulated drivers')
     release = Param.String('5.1.0', "Linux kernel uname release")
 
+    stackbase = Param.UInt64(0x7FFFFFFF, 'simulation stack base of program')
+    mmapend = Param.UInt64(0x41000000, 'simulation the mmap addr end place')
+
+
     @classmethod
     def export_methods(cls, code):
         code('bool map(Addr vaddr, Addr paddr, int sz, bool cacheable=true);')
