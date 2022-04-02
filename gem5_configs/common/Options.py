@@ -112,6 +112,8 @@ def addNoISAOptions(parser):
                         default='1GHz',
                         help="""Top-level clock for blocks running at system
                       speed""")
+    # temp config
+    parser.add_argument("--ckptinsts", type=int, default=10000)
 
     # Memory Options
     parser.add_argument("--list-mem-types",
