@@ -840,9 +840,9 @@ AtomicSimpleCPU::tick()
 
         if(fault == NoFault && simInstNum >= (ckptinsts+3) ) {
             TheISA::PCState pcState = thread->pcState();
-            pcState.set(tempregs[6]);
+            pcState.set(tempregs[1]);
             thread->pcState(pcState);
-            printf("simInstNum: %d, exit and jmp to pc: 0x%lx (rtemp %d)\n", simInstNum, tempregs[6], 6);
+            printf("simInstNum: %d, exit and jmp to pc: 0x%lx (rtemp %d)\n", simInstNum, tempregs[1], 1);
             simInstNum = 0;
             startshow = false;
         }

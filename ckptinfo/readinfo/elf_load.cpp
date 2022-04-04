@@ -70,11 +70,21 @@ void replaceEcall(uint16_t *text, uint64_t length)
     }
 }
 
-uint64_t loadelf(char * progname)
+uint64_t loadelf(char * progname, char *ckptinfo)
 {
 	Elf64_Ehdr ehdr;
 	Elf64_Phdr phdr;
     uint64_t startvaddr;
+
+    FILE *fp1 = fopen(ckptinfo, "rb");
+    if (fp1 == NULL) {
+		printf("cannot open %s\n", progname);
+        exit(1);
+	}
+    MemRangeInfo textinfo;
+    uint64_t numinfos = 0;
+    fread(&numinfos, 8, 1, fp1);
+    printf("numinfos: %d\n", numinfos);
 
 	FILE *fp = fopen(progname, "r");
 	if (fp == 0) {
@@ -129,29 +139,39 @@ uint64_t loadelf(char * progname)
             //     exit(1);
             // }
 
-            //find text segment and replace ecall with jmp rtemp
-            Elf64_Shdr string_shdr, shdr;
-            fseek(fp, ehdr.e_shoff + ehdr.e_shstrndx * ehdr.e_shentsize, SEEK_SET);
-            fread(&string_shdr, sizeof(string_shdr), 1, fp);
-	        fseek(fp, string_shdr.sh_offset + string_shdr.sh_size, SEEK_SET);
-            printf("--- ecall replace in text segment --- \n");
-            for (int c = 0; c < ehdr.e_shnum; c++) {
-                fseek(fp, ehdr.e_shoff + c * ehdr.e_shentsize, SEEK_SET);
-                fread(&shdr, sizeof(shdr), 1, fp);
-                
-                if(shdr.sh_size!=0 && shdr.sh_flags & 0x4){//SHF_EXECINSTR = 0x4
-                    fseek(fp, shdr.sh_offset, SEEK_SET);
-                    if(ShowLog){
-                        printf("load executable segment, addr: 0x%lx, size: 0x%lx, end: 0x%lx\n", shdr.sh_addr, shdr.sh_size, shdr.sh_size+shdr.sh_addr);
-                    }
-                    //选择只load可以被执行的代码段，其余不加载，以减少恢复时间
-                    if (fread((void *)shdr.sh_addr, shdr.sh_size, 1, fp) != 1) {    //加载执行的段
-                        printf("cannot read shdr from file\n");
-                        exit(1);
-                    }
-                    replaceEcall((uint16_t *)shdr.sh_addr, shdr.sh_size/2);
-                }
+            //仅加载被使用到的代码段
+            for(int i=0;i<numinfos;i++){
+                fread(&textinfo, sizeof(MemRangeInfo), 1, fp1);
+                unsigned int offset = textinfo.addr - phdr.p_vaddr + phdr.p_offset;
+                fseek(fp, offset, SEEK_SET);
+                printf("load text segment, addr: 0x%lx, size: 0x%lx, end: 0x%lx\n", textinfo.addr, textinfo.size, textinfo.addr + textinfo.size);
+                fread((void *)textinfo.addr, textinfo.size, 1, fp);
+                replaceEcall((uint16_t *)textinfo.addr, textinfo.size/2);
             }
+
+            //find text segment and replace ecall with jmp rtemp
+            // Elf64_Shdr string_shdr, shdr;
+            // fseek(fp, ehdr.e_shoff + ehdr.e_shstrndx * ehdr.e_shentsize, SEEK_SET);
+            // fread(&string_shdr, sizeof(string_shdr), 1, fp);
+	        // fseek(fp, string_shdr.sh_offset + string_shdr.sh_size, SEEK_SET);
+            // printf("--- ecall replace in text segment --- \n");
+            // for (int c = 0; c < ehdr.e_shnum; c++) {
+            //     fseek(fp, ehdr.e_shoff + c * ehdr.e_shentsize, SEEK_SET);
+            //     fread(&shdr, sizeof(shdr), 1, fp);
+                
+            //     if(shdr.sh_size!=0 && shdr.sh_flags & 0x4){//SHF_EXECINSTR = 0x4
+            //         fseek(fp, shdr.sh_offset, SEEK_SET);
+            //         if(ShowLog){
+            //             printf("load executable segment, addr: 0x%lx, size: 0x%lx, end: 0x%lx\n", shdr.sh_addr, shdr.sh_size, shdr.sh_size+shdr.sh_addr);
+            //         }
+            //         //选择只load可以被执行的代码段，其余不加载，以减少恢复时间
+            //         if (fread((void *)shdr.sh_addr, shdr.sh_size, 1, fp) != 1) {    //加载执行的段
+            //             printf("cannot read shdr from file\n");
+            //             exit(1);
+            //         }
+            //         replaceEcall((uint16_t *)shdr.sh_addr, shdr.sh_size/2);
+            //     }
+            // }
             // if (!(prot & PROT_WRITE)){
             //     if (mprotect((void *)phdr.p_vaddr, phdr.p_memsz, prot) == -1) {
             //         printf("mprotect error: %d\n", i);
@@ -161,5 +181,6 @@ uint64_t loadelf(char * progname)
         }
 	}
     fclose(fp);
+    fclose(fp1);
     return startvaddr;
 }

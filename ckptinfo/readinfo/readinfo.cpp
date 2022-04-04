@@ -14,7 +14,7 @@ int main(int argc, char **argv)
         printf("cannot alloc memory in 0x%lx for record runtime information, alloc: 0x%lx\n", RunningInfoAddr, alloc_vaddr);
         return 0;
     }
-    loadelf(argv[3]);
+    loadelf(argv[3], argv[1]);
     read_ckptinfo(argv[1], argv[2]);
     return 0;
 }

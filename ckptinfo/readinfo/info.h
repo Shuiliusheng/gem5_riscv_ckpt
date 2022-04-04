@@ -19,7 +19,7 @@
 #define StoreIntRegAddr "0x150018"
 #define OldIntRegAddr   "0x150218"
 
-#define TakeOverAddrFalse 0x10662
+#define TakeOverAddrFalse 0x10666
 #define TakeOverAddrTrue 0x10666
 
 typedef struct{
@@ -36,10 +36,12 @@ typedef struct{
     uint64_t size;
 }MemRangeInfo;
 
+
+
 extern MemRangeInfo data_seg, text_seg;
 
 void takeoverSyscall();
-uint64_t loadelf(char * progname);
+uint64_t loadelf(char * progname, char *ckptinfo);
 void read_ckptsyscall(char filename[]);
 void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[]);
 

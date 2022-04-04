@@ -44,7 +44,7 @@ void read_ckptsyscall(char filename[])
 
 void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
 {
-    uint64_t npc, mrange_num=0, loadnum = 0;
+    uint64_t npc, mrange_num=0, loadnum = 0, temp=0;
     MemRangeInfo memrange, extra;
     LoadInfo loadinfo;
     FILE *p=NULL;
@@ -53,6 +53,9 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
         printf("cannot open %s to read\n", ckptinfo);
         exit(1);
     }
+
+    fread(&temp, 8, 1, p);
+    fseek(p, 16*temp+8, SEEK_SET);
 
     //step 1: read npc
     fread(&npc, 8, 1, p);
