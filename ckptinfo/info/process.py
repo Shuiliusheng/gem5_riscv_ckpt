@@ -276,17 +276,19 @@ def getMemRange(meminfo, syscallinfos):
         idx = idx1
     return memrange
 
-def process(end, reginfo, meminfo, syscallinfo):
+def process(end, reginfo, meminfo, syscallinfo, textinfo):
     startpoint = processRegInfo(reginfo)
     syscallinfos = processSyscall(syscallinfo)
     loadinfo = getLoadInfo(meminfo)
     memrange = getMemRange(meminfo, syscallinfos)
-    writefile(startpoint, syscallinfos, loadinfo, memrange, end)
+    writefile(startpoint, syscallinfos, loadinfo, memrange, textinfo, end)
     startpoint.show()
-    for syscall in syscallinfos:
-        syscall.show()
-    for mem in memrange:
-        mem.show()
+    # for syscall in syscallinfos:
+    #     syscall.show()
+    # for mem in memrange:
+    #     mem.show()
+    for text in textinfo:
+        text.show()
     
 
 def readfile(filename):
@@ -294,6 +296,7 @@ def readfile(filename):
     meminfo = []
     reginfo = []
     syscallinfo = []
+    textinfo = []
     end = 0
     numline = 0
     while 1:
@@ -307,6 +310,15 @@ def readfile(filename):
         if line.find("{") == -1 or line.find("}") == -1:
             print(numline, line)
             continue
+
+        if line.find("textRange") != -1:
+            data = json.loads(line)
+            idx1 = 0
+            while idx1 < len(data['addr']):
+                textinfo.append(Memdata(int(data['addr'][idx1], 16), 0, int(data['size'][idx1], 16)))
+                idx1 = idx1 + 1
+            continue
+        
         
         if line.find("mem_read") != -1 or line.find("mem_write") != -1 or line.find("mem_atomic") != -1:
             meminfo.append(line)
@@ -323,18 +335,26 @@ def readfile(filename):
         if line.find("int_regs") != -1:
             if len(reginfo) > 0:
                 end = json.loads(line)['inst_num']
-                process(end, reginfo, meminfo, syscallinfo)
+                process(end, reginfo, meminfo, syscallinfo, textinfo)
             reginfo = []
             meminfo = []
             syscallinfo = []
             reginfo.append(line)
     file.close()
 
-def writefile(startpoint, syscallinfos, loadinfo, memrange, end):
+def writefile(startpoint, syscallinfos, loadinfo, memrange, textinfo, end):
     ckptname = "ckpt_"+str(startpoint.inst_num)+"_"+str(end)+".info"
     syscallname = "ckpt_syscall_"+str(startpoint.inst_num)+"_"+str(end)+".info"
 
     f1 = open(ckptname, 'wb')
+
+    #write textinfo
+    f1.write(toBytes(len(textinfo), 8))    ## write number
+    print(len(textinfo))
+    for r in textinfo:
+        f1.write(toBytes(r.addr, 8))
+        f1.write(toBytes(r.size, 8))
+
     #write npc
     f1.write(toBytes(int(startpoint.npc, 16), 8))
     #write int regs

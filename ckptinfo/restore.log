@@ -77,3 +77,8 @@
   312  build/RISCV/gem5.opt ./configs/example/se.py --ckptinsts=3000000 -c ckptinfo/readinfo/read.riscv --options="ckptinfo/info/ckpt_3000000_6000000.info ckptinfo/info/ckpt_syscall_3000000_6000000.info ckptinfo/test/big1.riscv"
   313  build/RISCV/gem5.opt ./configs/example/se.py --ckptinsts=3000000 -c ckptinfo/readinfo/read.riscv --options="ckptinfo/info/ckpt_6000000_9000000.info ckptinfo/info/ckpt_syscall_6000000_9000000.info ckptinfo/test/big1.riscv"
   314  build/RISCV/gem5.opt ./configs/example/se.py --ckptinsts=3000000 -c ckptinfo/readinfo/read.riscv --options="ckptinfo/info/ckpt_9000000_12000000.info ckptinfo/info/ckpt_syscall_9000000_12000000.info ckptinfo/test/big1.riscv"
+
+
+  build/RISCV/gem5.opt ./configs/example/se.py --ckptinsts=20000 -c ckptinfo/readinfo/readinfo.riscv --options="ckptinfo/info/ckpt_20000_40000.info ckptinfo/info/ckpt_syscall_20000_40000.info ckptinfo/test/test1.riscv"
+
+build/RISCV/gem5.opt ./configs/example/se.py --ckptinsts=300000 -c ckptinfo/readinfo/readinfo.riscv --options="ckptinfo/info/biginfo/ckpt_300000_600000.info ckptinfo/info/biginfo/ckpt_syscall_300000_600000.info ckptinfo/test/big.riscv"

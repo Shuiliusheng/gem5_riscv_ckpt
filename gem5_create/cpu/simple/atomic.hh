@@ -46,6 +46,17 @@
 #include "mem/request.hh"
 #include "params/AtomicSimpleCPU.hh"
 #include "sim/probe/probe.hh"
+#include "debug/ShowRegInfo.hh"
+
+#include <set>
+#include <vector>
+using namespace std;
+
+typedef struct{
+  unsigned long long addr;
+  unsigned int size;
+}CodeRange;
+
 
 namespace gem5
 {
@@ -62,6 +73,78 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     unsigned long long tempregs[32];
 
     bool startshow = false;
+
+    bool needshowFirst = false;
+
+    set<Addr> preinsts;
+    set<Addr> exeinsts;
+
+    void showCodeRange(){
+      vector<Addr> insts;
+      set<Addr>::iterator iter;
+      set<Addr> temp;
+      for(iter = exeinsts.begin() ; iter != exeinsts.end() ; ++iter) {
+        for(int i=0;i<4;i++){
+          temp.insert((*iter)+i);
+        }
+      }
+      for(iter = temp.begin() ; iter != temp.end() ; ++iter) {
+        insts.push_back(*iter);
+      }
+      unsigned int page = 4096;
+      int i=0, j=0;
+      vector<CodeRange> range1;
+      for(i=0;i<insts.size();i++){
+        unsigned long long start = insts[i] - (insts[i]%4096);
+        unsigned long long end = start + page;
+        for(j=i+1;j<insts.size();j++){
+          if(insts[j] >= end){
+            break;
+          }
+        }
+        CodeRange r;
+        r.addr = start;
+        r.size = page;
+        // printf("raw range: (0x%lx, 0x%lx, 0x%lx)\n", r.addr, r.addr+r.size, r.size);
+        range1.push_back(r);
+        i = j-1;
+      }
+
+      vector<CodeRange> range2;
+      for(i=0;i<range1.size();i++){
+        for(j=i+1;j<range1.size();j++){
+          if(range1[j].addr - range1[i].addr != (j-i)*page){
+            break;
+          }
+        }
+        CodeRange r;
+        r.addr = range1[i].addr;
+        r.size = (j-i)*page;
+        range2.push_back(r);
+        i = j - 1;
+      }
+
+      char str[3000];
+      sprintf(str, "{\"type\": \"textRange\", \"addr\": [ ");
+      for(i=0;i<range2.size()-1;i++){
+          sprintf(str, "%s\"0x%llx\", ", str, range2[i].addr);
+      }
+      sprintf(str, "%s\"0x%llx\" ], \"size\": [ ", str, range2[range2.size()-1].addr);
+
+      for(i=0;i<range2.size()-1;i++){
+          sprintf(str, "%s\"0x%llx\", ", str, range2[i].size);
+      }
+      DPRINTF(ShowRegInfo, "%s\"0x%llx\" ] }\n", str, range2[range2.size()-1].size);
+
+      for(i=0;i<range2.size();i++){
+        printf("range %d: (0x%lx, 0x%lx, 0x%lx)\n", i, range2[i].addr, range2[i].addr+range2[i].size, range2[i].size);
+      }
+
+      range2.clear();
+      range1.clear();
+      temp.clear();
+      insts.clear();
+    }
 
   protected:
     EventFunctionWrapper tickEvent;

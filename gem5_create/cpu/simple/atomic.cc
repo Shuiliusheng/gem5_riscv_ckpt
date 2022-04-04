@@ -107,7 +107,6 @@ AtomicSimpleCPU::drain()
 {
     // Deschedule any power gating event (if any)
     deschedulePowerGatingEvent();
-
     if (switchedOut())
         return DrainState::Drained;
 
@@ -713,6 +712,8 @@ AtomicSimpleCPU::tick()
                 //}
             }
 
+            exeinsts.insert(thread->pcState().pc());
+
             preExecute();
 
             Tick stall_ticks = 0;
@@ -731,6 +732,14 @@ AtomicSimpleCPU::tick()
                         for(int i=0;i<31;i++){
                             DPRINTF(ShowDetail, "r%d: 0x%lx\n", i, thread->readIntReg(i));
                         }
+                    }
+                }
+
+                if(curStaticInst->isSyscall()){
+                    preinsts.clear();
+                    DPRINTF(ShowRegInfo, "{\"type\": \"isSyscall\", \"inst_num\": \"%d\", \"pc\": \"0x%lx\"}\n", t_info.numInst, thread->pcState().pc());
+                    if(thread->readIntReg(17) == 0x5e){
+                        showCodeRange();
                     }
                 }
 
@@ -754,6 +763,7 @@ AtomicSimpleCPU::tick()
                     }
 
                     if ((t_info.numInst % ckptinsts == 0) && (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowRegInfo))) {
+                        needshowFirst = true;
                         char str[3000];
                         sprintf(str, "{\"type\": \"int_regs\", \"inst_num\": \"%d\", \"inst_pc\": \"0x%llx\", \"npc\": \"0x%llx\", \"data\": [ ", t_info.numInst, thread->pcState().pc(), thread->nextInstAddr());
                         for(int i=0;i<31;i++){
@@ -766,7 +776,20 @@ AtomicSimpleCPU::tick()
                             sprintf(str, "%s\"0x%llx\", ", str, thread->readFloatReg(i));
                         }
                         DPRINTF(ShowRegInfo, "%s\"0x%llx\" ]}\n", str, thread->readFloatReg(31));
+                        printf("ckpt place, exe number: %ld\n", exeinsts.size());
+                        // showCodeRange();
+                        // for(iter = exeinsts.begin() ; iter != exeinsts.end() ; ++iter) {
+                        //     printf("pc: 0x%lx\n", *iter);
+                        // }
+                        // exeinsts.clear();
                     }
+                    bool isInPre = preinsts.find(thread->pcState().pc()) != preinsts.end();
+                    bool isInPre1 = preinsts.find(thread->pcState().pc()+2) != preinsts.end(); //保证不是一条压缩指令的情况下, 下一条也不在
+                    if(!isInPre && needshowFirst && !isInPre1){
+                        DPRINTF(ShowRegInfo, "{\"type\": \"ckptExitInst\", \"inst_num\": \"%d\", \"inst_pc\": \"0x%lx\"}\n", t_info.numInst, thread->pcState().pc());
+                        needshowFirst = false;
+                    }    
+                    preinsts.insert(thread->pcState().pc());
 
                 } else if (traceData) {
                     traceFault();
