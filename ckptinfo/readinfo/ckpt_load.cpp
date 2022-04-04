@@ -22,7 +22,7 @@ void read_ckptsyscall(char filename[])
     fseek(fp, 0, SEEK_SET);
 
     allocsize = filesize + (4096-filesize%4096);
-    alloc_vaddr = (uint64_t)mmap((void *)0x2000000, allocsize, PROT_READ | PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, 0);    
+    alloc_vaddr = (uint64_t)mmap((void *)0x2000000, allocsize, PROT_READ | PROT_WRITE, MAP_PRIVATE|MAP_ANON|MAP_FIXED, -1, 0);    
     
     if (fread((void *)alloc_vaddr, filesize, 1, fp) != 1) {
         printf("cannot read file: %s\n", filename);
@@ -96,7 +96,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
 
         if(memrange.size !=0){
             if(memrange.addr < 0xfffffffff){ // a small limit
-                int* arr = static_cast<int*>(mmap((void *)memrange.addr, memrange.size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, 0, 0));
+                int* arr = static_cast<int*>(mmap((void *)memrange.addr, memrange.size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, 0, 0));
                 if(ShowLog)
                     printf("map range: (0x%lx, 0x%lx), mapped addr: 0x%lx\n", memrange.addr, memrange.addr + memrange.size, arr);
                 assert(memrange.addr == (uint64_t)arr);  
@@ -104,7 +104,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
         }
 
         if(extra.size !=0){
-            int* arr1 = static_cast<int*>(mmap((void *)extra.addr, extra.size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, 0, 0));
+            int* arr1 = static_cast<int*>(mmap((void *)extra.addr, extra.size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, 0, 0));
             if(ShowLog)
                 printf("map range: (0x%lx, 0x%lx), mapped addr: 0x%lx\n", extra.addr, extra.addr + extra.size, arr1);
             assert(extra.addr == (uint64_t)arr1); 
@@ -132,9 +132,9 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
 
     //step6: init npc and takeover_syscall addr to temp register
     printf("--- step 6, init npc to rtemp(5) and takeover_syscall addr to rtemp(6) ---\n");
-    WriteTemp("5", npc);
+    WriteTemp("0", npc);
     uint64_t takeover_addr = ShowLog ? TakeOverAddrTrue : TakeOverAddrFalse;
-    WriteTemp("6", takeover_addr);
+    WriteTemp("1", takeover_addr);
 
     //step7: save registers data of boot program 
     printf("--- step 789, save registers data of boot program, set testing program registers, start testing ---\n");
@@ -144,5 +144,5 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     Load_regs(StoreIntRegAddr);
 
     //step9: start the testing program
-    JmpTemp("5");
+    JmpTemp("0");
 }

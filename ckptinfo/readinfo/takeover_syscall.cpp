@@ -81,7 +81,7 @@ void takeoverSyscall()
 
     runinfo->nowcallnum ++;
     uint64_t npc = infos->pc + 4;
-    WriteTemp("5", npc);
+    WriteTemp("2", npc);
     Load_regs(StoreIntRegAddr);
-    JmpTemp("5");
+    JmpTemp("2");
 }

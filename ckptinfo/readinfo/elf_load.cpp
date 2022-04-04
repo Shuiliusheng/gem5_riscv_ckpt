@@ -60,8 +60,8 @@ static inline int get_prot(uint32_t p_flags)
 void replaceEcall(uint16_t *text, uint64_t length)
 {
     uint16_t data1 = 0x0000, data0 = 0x0073;
-    //JmpTemp("6");//00606033
-    uint16_t pdata1 = 0x0060, pdata0 = 0x6033;
+    //JmpTemp("1");//00106033
+    uint16_t pdata1 = 0x0010, pdata0 = 0x6033;
     for(int i=0;i<length;i++) {
         if(text[i] == data0 && text[i+1] == data1){
             text[i] = pdata0;
@@ -123,11 +123,11 @@ uint64_t loadelf(char * progname)
                 exit(1);
             }
                 
-            fseek(fp, phdr.p_offset, SEEK_SET);
-            if (fread((void *)phdr.p_vaddr, phdr.p_filesz, 1, fp) != 1) {
-                printf("cannot read phdr from file: %d\n", i);
-                exit(1);
-            }
+            // fseek(fp, phdr.p_offset, SEEK_SET);
+            // if (fread((void *)phdr.p_vaddr, phdr.p_filesz, 1, fp) != 1) {
+            //     printf("cannot read phdr from file: %d\n", i);
+            //     exit(1);
+            // }
 
             //find text segment and replace ecall with jmp rtemp
             Elf64_Shdr string_shdr, shdr;
@@ -137,17 +137,27 @@ uint64_t loadelf(char * progname)
             printf("--- ecall replace in text segment --- \n");
             for (int c = 0; c < ehdr.e_shnum; c++) {
                 fseek(fp, ehdr.e_shoff + c * ehdr.e_shentsize, SEEK_SET);
-                fread(&shdr, sizeof(shdr), 1, fp );
+                fread(&shdr, sizeof(shdr), 1, fp);
+                
                 if(shdr.sh_size!=0 && shdr.sh_flags & 0x4){//SHF_EXECINSTR = 0x4
+                    fseek(fp, shdr.sh_offset, SEEK_SET);
+                    if(ShowLog){
+                        printf("load executable segment, addr: 0x%lx, size: 0x%lx, end: 0x%lx\n", shdr.sh_addr, shdr.sh_size, shdr.sh_size+shdr.sh_addr);
+                    }
+                    //选择只load可以被执行的代码段，其余不加载，以减少恢复时间
+                    if (fread((void *)shdr.sh_addr, shdr.sh_size, 1, fp) != 1) {    //加载执行的段
+                        printf("cannot read shdr from file\n");
+                        exit(1);
+                    }
                     replaceEcall((uint16_t *)shdr.sh_addr, shdr.sh_size/2);
                 }
             }
-            if (!(prot & PROT_WRITE)){
-                if (mprotect((void *)phdr.p_vaddr, phdr.p_memsz, prot) == -1) {
-                    printf("mprotect error: %d\n", i);
-                    exit(1);
-                }
-            }
+            // if (!(prot & PROT_WRITE)){
+            //     if (mprotect((void *)phdr.p_vaddr, phdr.p_memsz, prot) == -1) {
+            //         printf("mprotect error: %d\n", i);
+            //         exit(1);
+            //     }
+            // }
         }
 	}
     fclose(fp);

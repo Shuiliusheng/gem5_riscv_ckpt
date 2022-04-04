@@ -65,7 +65,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[]);
 ); 
 
 #define Save_int_regs(BaseAddr) asm volatile( \
-    "sub x0, a0, x7 #save a0 to rtemp7 \n\t"   \
+    "sub x0, a0, x2 #save a0 to rtemp2 \n\t"   \
     "fence \n\t"   \
     "li a0, " BaseAddr " \n\t"   \
     "sd x1,8*1(a0)  \n\t"   \
@@ -99,9 +99,9 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[]);
     "sd x29,8*29(a0)  \n\t"   \
     "sd x30,8*30(a0)  \n\t"   \
     "sd x31,8*31(a0)  \n\t"   \
-    "add x0, a1, x7  #read rtemp7 to a1  \n\t"   \
+    "add x0, a1, x2  #read rtemp2 to a1  \n\t"   \
     "fence  \n\t"   \
-    "sd a1,8*10(a0)  #read rtemp7 to a1  \n\t"   \
+    "sd a1,8*10(a0)  #read rtemp2 to a1  \n\t"   \
 );  
 
 #define Load_regs(BaseAddr) asm volatile( \
@@ -141,7 +141,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[]);
 
 
 #define Save_fp_regs(BaseAddr) asm volatile( \
-    "sub x0, a0, x7 #save a0 to rtemp7 \n\t"   \
+    "sub x0, a0, x2 #save a0 to rtemp7 \n\t"   \
     "fence \n\t"   \
     "li a0, " BaseAddr " \n\t"   \
     "fsd f1,8*0(a0)  \n\t"   \
@@ -176,12 +176,12 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[]);
     "fsd f29,8*29(a0)  \n\t"   \
     "fsd f30,8*30(a0)  \n\t"   \
     "fsd f31,8*31(a0)  \n\t"   \
-    "add x0, a0, x7  #read rtemp7 back to a0  \n\t"   \
+    "add x0, a0, x2  #read rtemp7 back to a0  \n\t"   \
     "fence  \n\t"   \
 );  
 
 #define Load_fp_regs(BaseAddr) asm volatile( \
-    "sub x0, a0, x7 #save a0 to rtemp7 \n\t"   \
+    "sub x0, a0, x2 #save a0 to rtemp7 \n\t"   \
     "fence \n\t"   \
     "li a0, " BaseAddr " \n\t"   \
     "fld f0,8*0(a0)  \n\t"   \
@@ -216,7 +216,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[]);
     "fld f29,8*29(a0)  \n\t"   \
     "fld f30,8*30(a0)  \n\t"   \
     "fld f31,8*31(a0)  \n\t"   \
-    "add x0, a0, x7  #read rtemp7 back to a0  \n\t"   \
+    "add x0, a0, x2  #read rtemp7 back to a0  \n\t"   \
     "fence  \n\t"   \
 ); 
 

@@ -9,9 +9,9 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    uint64_t alloc_vaddr = (uint64_t)mmap((void*)RunningInfoAddr, 4096*2, PROT_READ | PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, 0);
+    uint64_t alloc_vaddr = (uint64_t)mmap((void*)RunningInfoAddr, 4096*2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON | MAP_FIXED, -1, 0);
     if(alloc_vaddr != RunningInfoAddr){
-        printf("cannot alloc memory in 0x%lx for record runtime information\n", RunningInfoAddr);
+        printf("cannot alloc memory in 0x%lx for record runtime information, alloc: 0x%lx\n", RunningInfoAddr, alloc_vaddr);
         return 0;
     }
     loadelf(argv[3]);

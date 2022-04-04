@@ -27,7 +27,7 @@ int main()
 	int fd;
     fd = open("test.txt", O_RDONLY);
 	fstat(fd, &buf);
-   	printf("/etc/passwd file size +%d\n ", buf.st_size);
+   	printf("file size +%d\n ", buf.st_size);
 	printf("buf addr: 0x%lx, %d\n", (unsigned long long)&buf, sizeof(struct stat));
 
 	printf("stat, dev: 0x%lx, ino: 0x%lx, mode: 0x%lx\n", buf.st_dev, buf.st_ino, buf.st_mode);
