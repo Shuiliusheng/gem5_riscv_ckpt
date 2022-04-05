@@ -70,6 +70,23 @@ class Memdata:
     def show(self):
         print('addr: 0x%x'%self.addr, ", data: 0x%x"%self.data, ", size: 0x%x"%self.size)
 
+class CkptExitInfo:
+    exitpc = 0
+    inst_num = 0
+    reason = ""
+    last_syspc = 0
+    last_sysnum = 0
+    def __init__(self, inst_num = 0, exitpc = 0, reason = ""):
+        self.exitpc = exitpc
+        self.inst_num = inst_num
+        self.reason = reason
+        self.last_syspc = 0
+        self.last_sysnum = 0
+
+    def show(self):
+        print("last syscall info", 'instnum: %d'%self.last_sysnum, 'pc: 0x%x'%self.last_syspc)
+        print("choiced exit info", 'instnum: %d'%self.inst_num, 'pc: 0x%x'%self.exitpc, self.reason)
+
 def getaddr(load):
     return load.addr
 
@@ -93,7 +110,7 @@ def processSyscall(syscallinfo):
     syscallinfos = []
     while idx < len(syscallinfo):
         enter = json.loads(syscallinfo[idx])
-        print(enter)
+        # print(enter)
         if enter['type'] != "syscall enter":
             print("something is wrong enter!")
             print(enter)
@@ -276,31 +293,78 @@ def getMemRange(meminfo, syscallinfos):
         idx = idx1
     return memrange
 
-def process(end, reginfo, meminfo, syscallinfo, textinfo):
+def process(end, reginfo, meminfo, syscallinfo, textinfo, exitinfo):
     startpoint = processRegInfo(reginfo)
     syscallinfos = processSyscall(syscallinfo)
     loadinfo = getLoadInfo(meminfo)
     memrange = getMemRange(meminfo, syscallinfos)
-    writefile(startpoint, syscallinfos, loadinfo, memrange, textinfo, end)
+    writefile(startpoint, syscallinfos, loadinfo, memrange, textinfo, end, exitinfo)
     startpoint.show()
+    exitinfo.show()
+    print("ckpt sim inst number: ", exitinfo.inst_num - int(startpoint.inst_num, 10))
     # for syscall in syscallinfos:
     #     syscall.show()
     # for mem in memrange:
     #     mem.show()
-    for text in textinfo:
-        text.show()
-    
+    # for text in textinfo:
+    #     text.show()
+
+
+def findexit(file1, meminfo, reginfo, syscallinfo, textinfo, sysplace, end):
+    fileplace = file1.tell()
+    meminfo1 = []
+    exitinfo = CkptExitInfo(0, 0, "none")
+    if len(syscallinfo) > 0:
+        exitinfo.last_sysnum = int(sysplace[len(sysplace)-1]['inst_num'], 10)
+        exitinfo.last_syspc = int(sysplace[len(sysplace)-1]['pc'], 16)
+
+    while 1:
+        line = file1.readline()
+        if not line:
+            break
+        if line.find("{") == -1 and line.find("}") == -1:
+            continue
+
+        if line.find("{") == -1 or line.find("}") == -1:
+            print(line)
+            continue
+
+        if line.find("isSyscall") != -1:
+            data = json.loads(line)
+            exitinfo.reason = "exitSyscall"
+            exitinfo.exitpc = int(data['inst_pc'], 16)
+            exitinfo.inst_num = int(data['inst_num'], 10)
+            break
+
+        if line.find("ckptExitInst") != -1:
+            data = json.loads(line)
+            exitinfo.reason = "exitInst"
+            exitinfo.exitpc = int(data['inst_pc'], 16)
+            exitinfo.inst_num = int(data['inst_num'], 10)
+            break
+
+        if line.find("mem_read") != -1 or line.find("mem_write") != -1 or line.find("mem_atomic") != -1:
+            meminfo1.append(line)
+            # if len(meminfo1) % 200 == 0:
+            #     print(len(meminfo1), line)
+            continue
+
+    meminfo = meminfo + meminfo1
+    process(end, reginfo, meminfo, syscallinfo, textinfo, exitinfo)
+    file1.seek(fileplace, 0)
+
 
 def readfile(filename):
-    file = open(filename) 
+    file1 = open(filename) 
     meminfo = []
     reginfo = []
     syscallinfo = []
     textinfo = []
+    syscallplace = []
     end = 0
     numline = 0
     while 1:
-        line = file.readline()
+        line = file1.readline()
         numline += 1
         if not line:
             break
@@ -319,13 +383,16 @@ def readfile(filename):
                 idx1 = idx1 + 1
             continue
         
-        
         if line.find("mem_read") != -1 or line.find("mem_write") != -1 or line.find("mem_atomic") != -1:
             meminfo.append(line)
             continue
 
         if line.find("syscall") != -1:
             syscallinfo.append(line)
+            continue
+
+        if line.find("isSyscall") != -1:
+            syscallplace.append(json.loads(line))
             continue
 
         if line.find("fp_regs") != -1:
@@ -335,25 +402,36 @@ def readfile(filename):
         if line.find("int_regs") != -1:
             if len(reginfo) > 0:
                 end = json.loads(line)['inst_num']
-                process(end, reginfo, meminfo, syscallinfo, textinfo)
+                findexit(file1, meminfo, reginfo, syscallinfo, textinfo, syscallplace, end)
             reginfo = []
             meminfo = []
             syscallinfo = []
+            syscallplace = []
             reginfo.append(line)
-    file.close()
+    file1.close()
 
-def writefile(startpoint, syscallinfos, loadinfo, memrange, textinfo, end):
-    ckptname = "ckpt_"+str(startpoint.inst_num)+"_"+str(end)+".info"
-    syscallname = "ckpt_syscall_"+str(startpoint.inst_num)+"_"+str(end)+".info"
+def writefile(startpoint, syscallinfos, loadinfo, memrange, textinfo, end, exitinfo):
+    ckptname = "ckpt_"+str(startpoint.inst_num)+".info"
+    syscallname = "ckpt_syscall_"+str(startpoint.inst_num)+".info"
 
     f1 = open(ckptname, 'wb')
 
     #write textinfo
     f1.write(toBytes(len(textinfo), 8))    ## write number
-    print(len(textinfo))
     for r in textinfo:
         f1.write(toBytes(r.addr, 8))
         f1.write(toBytes(r.size, 8))
+
+    #write sim information
+    f1.write(toBytes(int(startpoint.inst_num, 10), 8))
+    f1.write(toBytes((exitinfo.inst_num - int(startpoint.inst_num, 10)), 8))
+    f1.write(toBytes(exitinfo.exitpc, 8))
+    if exitinfo.reason == "exitSyscall":
+        f1.write(toBytes(1, 8))
+    elif exitinfo.reason == "exitInst":
+        f1.write(toBytes(2, 8))
+    else:
+        f1.write(toBytes(0, 8))
 
     #write npc
     f1.write(toBytes(int(startpoint.npc, 16), 8))

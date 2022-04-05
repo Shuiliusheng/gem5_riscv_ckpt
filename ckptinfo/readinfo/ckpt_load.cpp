@@ -6,6 +6,12 @@ typedef struct{
     uint64_t data;
 }LoadInfo;
 
+typedef struct{
+    uint64_t start;
+    uint64_t simNum;
+    uint64_t exitpc;
+    uint64_t exit_cause;
+}SimInfo;
 
 void read_ckptsyscall(char filename[])
 {
@@ -47,6 +53,9 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     uint64_t npc, mrange_num=0, loadnum = 0, temp=0;
     MemRangeInfo memrange, extra;
     LoadInfo loadinfo;
+    SimInfo siminfo;
+    RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
+    
     FILE *p=NULL;
     p = fopen(ckptinfo,"rb");
     if(p == NULL){
@@ -57,13 +66,17 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     fread(&temp, 8, 1, p);
     fseek(p, 16*temp+8, SEEK_SET);
 
+    fread(&siminfo, sizeof(siminfo), 1, p);
+    printf("siminfo, start: %d, simNum: %d, exitpc: 0x%lx, cause: %d\n", siminfo.start, siminfo.simNum, siminfo.exitpc, siminfo.exit_cause);
+    runinfo->exitpc = siminfo.exitpc;
+    runinfo->exit_cause = siminfo.exit_cause;
+
     //step 1: read npc
     fread(&npc, 8, 1, p);
     printf("--- step 1, read npc: 0x%lx ---\n", npc);
 
 
     //step 2: read integer and float registers
-    RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
     fread(&runinfo->intregs[0], 8, 32, p);
     fread(&runinfo->fpregs[0], 8, 32, p);
     printf("--- step 2, read integer and float registers ---\n");
@@ -132,6 +145,13 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     
     //step5: 加载syscall的执行信息到内存中
     read_ckptsyscall(ckpt_sysinfo);
+
+    //try to replace exit inst if syscall totalnum == 0
+    if(runinfo->totalcallnum == 0 && runinfo->exit_cause == Cause_ExitInst) {
+        printf("--- step 5.1, syscall is zero, replace exitinst with jmp rtemp ---\n");
+        *((uint16_t *)runinfo->exitpc) = (ECall_Replace)%65536;
+        *((uint16_t *)(runinfo->exitpc+2)) = (ECall_Replace) >> 16;
+    }
 
     //step6: init npc and takeover_syscall addr to temp register
     printf("--- step 6, init npc to rtemp(5) and takeover_syscall addr to rtemp(6) ---\n");

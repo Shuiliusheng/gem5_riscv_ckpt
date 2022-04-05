@@ -1,94 +1,35 @@
-{'type': 'syscall enter', 'pc': '0x2171f6', 'sysnum': '0x40', 'param': ['0x1', '0x2612e0', '0x3d', '0x2612e0', '0x2a0']}
 ----------------------------------------------------
-startpoint, instplace: 20000, pc: 0x21639a, npc: 0x21639e
-sysinfo: 0x40 ((write(61, 2495200, 61))), pc: 0x2171f6, ret: 0x3d, bufaddr: 0x2612e0, data:  61
-addr: 0x23d000 , data: 0x0 , size: 0x1000
-addr: 0x24d000 , data: 0x0 , size: 0x1000
-addr: 0x257000 , data: 0x0 , size: 0x1000
-addr: 0x25c000 , data: 0x0 , size: 0x6000
-addr: 0x2fbe8000 , data: 0x0 , size: 0x1000
-{'type': 'syscall enter', 'pc': '0x2171f6', 'sysnum': '0x40', 'param': ['0x1', '0x2612e0', '0x3d', '0x2612e0', '0x2a0']}
-{'type': 'syscall enter', 'pc': '0x2171f6', 'sysnum': '0x40', 'param': ['0x1', '0x2612e0', '0x3d', '0x2612e0', '0x2a0']}
+startpoint, instplace: 20000, pc: 0x216380, npc: 0x216382
+last syscall info instnum: 29145 pc: 0x2171f6
+choiced exit info instnum: 41352 pc: 0x200642 exitInst
+ckpt sim inst number:  21352
 ----------------------------------------------------
-startpoint, instplace: 40000, pc: 0x20d3e4, npc: 0x20d3e6
-sysinfo: 0x40 ((write(61, 2495200, 61))), pc: 0x2171f6, ret: 0x3d, bufaddr: 0x2612e0, data:  61
-sysinfo: 0x40 ((write(61, 2495200, 61))), pc: 0x2171f6, ret: 0x3d, bufaddr: 0x2612e0, data:  61
-addr: 0x23d000 , data: 0x0 , size: 0x1000
-addr: 0x24d000 , data: 0x0 , size: 0x1000
-addr: 0x257000 , data: 0x0 , size: 0x1000
-addr: 0x25c000 , data: 0x0 , size: 0x6000
-addr: 0x2fbe8000 , data: 0x0 , size: 0x1000
-{'type': 'syscall enter', 'pc': '0x2171f6', 'sysnum': '0x40', 'param': ['0x1', '0x2612e0', '0x3d', '0x2612e0', '0x2a0']}
-{'type': 'syscall enter', 'pc': '0x2171f6', 'sysnum': '0x40', 'param': ['0x1', '0x2612e0', '0xf', '0x2612e0', '0x2a0']}
-{'type': 'syscall enter', 'pc': '0x216d34', 'sysnum': '0xa9', 'param': ['0x2fbe8c08', '0x0', '0xf', '0x1', '0x1']}
-{'type': 'syscall enter', 'pc': '0x2171f6', 'sysnum': '0x40', 'param': ['0x1', '0x2612e0', '0x20', '0x2612e0', '0x2a0']}
-{'type': 'syscall enter', 'pc': '0x2170d4', 'sysnum': '0x38', 'param': ['0xffffffffffffff9c', '0x23d2b8', '0x241', '0x1b6', '0x4']}
-{'type': 'syscall enter', 'pc': '0x217064', 'sysnum': '0x50', 'param': ['0x3', '0x2fbe8a90', '0x2fbe8a90', '0x0', '0x5e8']}
-{'type': 'syscall enter', 'pc': '0x2171f6', 'sysnum': '0x40', 'param': ['0x3', '0x263520', '0x190', '0x0', '0x2a0']}
-{'type': 'syscall enter', 'pc': '0x2176b2', 'sysnum': '0x39', 'param': ['0x3', '0x263520', '0x190', '0x0', '0x5e8']}
+startpoint, instplace: 40000, pc: 0x2085cc, npc: 0x2085ce
+last syscall info instnum: 53863 pc: 0x2171f6
+choiced exit info instnum: 66070 pc: 0x200642 exitInst
+ckpt sim inst number:  26070
 ----------------------------------------------------
-startpoint, instplace: 60000, pc: 0x2052ba, npc: 0x2052bc
-sysinfo: 0x40 ((write(61, 2495200, 61))), pc: 0x2171f6, ret: 0x3d, bufaddr: 0x2612e0, data:  61
-sysinfo: 0x40 ((write(15, 2495200, 15))), pc: 0x2171f6, ret: 0xf, bufaddr: 0x2612e0, data:  15
-sysinfo: 0xa9 ((gettimeofday(0, 0))), pc: 0x216d34, ret: 0x0, bufaddr: 0x2fbe8c08, data:  16
-sysinfo: 0x40 ((write(32, 2495200, 32))), pc: 0x2171f6, ret: 0x20, bufaddr: 0x2612e0, data:  32
-sysinfo: 0x38 ((openat(3, 2347704, 577, 438))), pc: 0x2170d4, ret: 0x3, bufaddr: 0x0, data:  0
-sysinfo: 0x50 ((fstat(0, 0x2fbe8a90))), pc: 0x217064, ret: 0x0, bufaddr: 0x2fbe8a90, data:  128
-sysinfo: 0x40 ((write(400, 2503968, 400))), pc: 0x2171f6, ret: 0x190, bufaddr: 0x263520, data:  400
-sysinfo: 0x39 ((close(0))), pc: 0x2176b2, ret: 0x0, bufaddr: 0x0, data:  0
-addr: 0x23d000 , data: 0x0 , size: 0x3000
-addr: 0x24d000 , data: 0x0 , size: 0x1000
-addr: 0x257000 , data: 0x0 , size: 0x1000
-addr: 0x25c000 , data: 0x0 , size: 0x6000
-addr: 0x263000 , data: 0x0 , size: 0x1000
-addr: 0x265000 , data: 0x0 , size: 0x1000
-addr: 0x2fbe8000 , data: 0x0 , size: 0x1000
+startpoint, instplace: 60000, pc: 0x208006, npc: 0x20800a
+last syscall info instnum: 70675 pc: 0x2176b2
+choiced exit info instnum: 111260 pc: 0x20074a exitInst
+ckpt sim inst number:  51260
 ----------------------------------------------------
-startpoint, instplace: 80000, pc: 0x200724, npc: 0x200728
-addr: 0x263000 , data: 0x0 , size: 0x2000
-addr: 0x2fbe8000 , data: 0x0 , size: 0x1000
-{'type': 'syscall enter', 'pc': '0x2171f6', 'sysnum': '0x40', 'param': ['0x1', '0x2612e0', '0x15', '0x2612e0', '0x2a0']}
-{'type': 'syscall enter', 'pc': '0x2170d4', 'sysnum': '0x38', 'param': ['0xffffffffffffff9c', '0x23d2b8', '0x0', '0x0', '0x410000']}
-{'type': 'syscall enter', 'pc': '0x217064', 'sysnum': '0x50', 'param': ['0x3', '0x2fbe8a90', '0x2fbe8a90', '0x1', '0x5e8']}
-{'type': 'syscall enter', 'pc': '0x21716a', 'sysnum': '0x3f', 'param': ['0x3', '0x265470', '0x2000', '0xfffffffffffff7ff', '0xfffffffffbad2488']}
-{'type': 'syscall enter', 'pc': '0x2176b2', 'sysnum': '0x39', 'param': ['0x3', '0x265600', '0xfffffffffbad2408', '0x0', '0x5e8']}
-{'type': 'syscall enter', 'pc': '0x216d34', 'sysnum': '0xa9', 'param': ['0x2fbe8bf8', '0x0', '0x261098', '0x1', '0x260f90']}
-{'type': 'syscall enter', 'pc': '0x2171f6', 'sysnum': '0x40', 'param': ['0x1', '0x2612e0', '0x1e', '0x2612e0', '0x2a0']}
+startpoint, instplace: 80000, pc: 0x200708, npc: 0x20070c
+last syscall info instnum: 0 pc: 0x0
+choiced exit info instnum: 111260 pc: 0x20074a exitInst
+ckpt sim inst number:  31260
 ----------------------------------------------------
-startpoint, instplace: 100000, pc: 0x200724, npc: 0x200728
-sysinfo: 0x40 ((write(21, 2495200, 21))), pc: 0x2171f6, ret: 0x15, bufaddr: 0x2612e0, data:  21
-sysinfo: 0x38 ((openat(3, 2347704, 0, 0))), pc: 0x2170d4, ret: 0x3, bufaddr: 0x0, data:  0
-sysinfo: 0x50 ((fstat(0, 0x2fbe8a90))), pc: 0x217064, ret: 0x0, bufaddr: 0x2fbe8a90, data:  128
-sysinfo: 0x3f ((read(400, 2511984, 8192))), pc: 0x21716a, ret: 0x190, bufaddr: 0x265470, data:  400
-sysinfo: 0x39 ((close(0))), pc: 0x2176b2, ret: 0x0, bufaddr: 0x0, data:  0
-sysinfo: 0xa9 ((gettimeofday(0, 0))), pc: 0x216d34, ret: 0x0, bufaddr: 0x2fbe8bf8, data:  16
-sysinfo: 0x40 ((write(30, 2495200, 30))), pc: 0x2171f6, ret: 0x1e, bufaddr: 0x2612e0, data:  30
-addr: 0x23d000 , data: 0x0 , size: 0x3000
-addr: 0x24d000 , data: 0x0 , size: 0x1000
-addr: 0x257000 , data: 0x0 , size: 0x1000
-addr: 0x25c000 , data: 0x0 , size: 0x6000
-addr: 0x263000 , data: 0x0 , size: 0x3000
-addr: 0x267000 , data: 0x0 , size: 0x1000
-addr: 0x2fbe8000 , data: 0x0 , size: 0x1000
-{'type': 'syscall enter', 'pc': '0x2171f6', 'sysnum': '0x40', 'param': ['0x1', '0x2612e0', '0x33', '0x2612e0', '0x2a0']}
+startpoint, instplace: 100000, pc: 0x200708, npc: 0x20070c
+last syscall info instnum: 115662 pc: 0x2171f6
+choiced exit info instnum: 127692 pc: 0x200820 exitInst
+ckpt sim inst number:  27692
 ----------------------------------------------------
-startpoint, instplace: 120000, pc: 0x207f1e, npc: 0x207f22
-sysinfo: 0x40 ((write(51, 2495200, 51))), pc: 0x2171f6, ret: 0x33, bufaddr: 0x2612e0, data:  51
-addr: 0x23d000 , data: 0x0 , size: 0x1000
-addr: 0x24d000 , data: 0x0 , size: 0x1000
-addr: 0x257000 , data: 0x0 , size: 0x1000
-addr: 0x25c000 , data: 0x0 , size: 0x6000
-addr: 0x263000 , data: 0x0 , size: 0x1000
-addr: 0x2fbe8000 , data: 0x0 , size: 0x1000
-{'type': 'syscall enter', 'pc': '0x2171f6', 'sysnum': '0x40', 'param': ['0x1', '0x2612e0', '0x3d', '0x2612e0', '0x2a0']}
-{'type': 'syscall enter', 'pc': '0x2171f6', 'sysnum': '0x40', 'param': ['0x1', '0x2612e0', '0x3d', '0x2612e0', '0x2a0']}
+startpoint, instplace: 120000, pc: 0x207dd4, npc: 0x207dd6
+last syscall info instnum: 127844 pc: 0x2171f6
+choiced exit info instnum: 140011 pc: 0x200820 exitInst
+ckpt sim inst number:  20011
 ----------------------------------------------------
-startpoint, instplace: 140000, pc: 0x20081a, npc: 0x20081c
-sysinfo: 0x40 ((write(61, 2495200, 61))), pc: 0x2171f6, ret: 0x3d, bufaddr: 0x2612e0, data:  61
-sysinfo: 0x40 ((write(61, 2495200, 61))), pc: 0x2171f6, ret: 0x3d, bufaddr: 0x2612e0, data:  61
-addr: 0x23d000 , data: 0x0 , size: 0x1000
-addr: 0x24d000 , data: 0x0 , size: 0x1000
-addr: 0x257000 , data: 0x0 , size: 0x1000
-addr: 0x25c000 , data: 0x0 , size: 0x6000
-addr: 0x263000 , data: 0x0 , size: 0x1000
-addr: 0x2fbe8000 , data: 0x0 , size: 0x1000
+startpoint, instplace: 140000, pc: 0x2052ba, npc: 0x2052bc
+last syscall info instnum: 152482 pc: 0x2171f6
+choiced exit info instnum: 164649 pc: 0x200820 exitInst
+ckpt sim inst number:  24649

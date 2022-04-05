@@ -15,12 +15,13 @@ void takeoverSyscall()
 
     RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
     uint64_t saddr = runinfo->syscall_info_addr;
+    SyscallInfo *infos = (SyscallInfo *)(saddr+8+runinfo->nowcallnum * sizeof(SyscallInfo));
+    
     if (runinfo->nowcallnum >= runinfo->totalcallnum){
-        printf("syscall is overflow, exit!\n");
+        printf("syscall is overflow, exit.\n");
         exit(0);
     }
 
-    SyscallInfo *infos = (SyscallInfo *)(saddr+8+runinfo->nowcallnum * sizeof(SyscallInfo));
     if(runinfo->intregs[17] != infos->num){
         printf("syscall num is wrong! callnum: 0x%lx, recorded num: 0x%lx, 0x%lx\n", runinfo->intregs[17], infos->pc, infos->num);
         exit(0);
@@ -80,6 +81,14 @@ void takeoverSyscall()
     }
 
     runinfo->nowcallnum ++;
+
+    if(runinfo->nowcallnum == runinfo->totalcallnum && runinfo->exit_cause == Cause_ExitInst) {
+        printf("--- exit the last syscall %d, and replace exit pc (0x%lx) with jmp ---\n", runinfo->nowcallnum, runinfo->exitpc);
+        *((uint16_t *)runinfo->exitpc) = (ECall_Replace)%65536;
+        *((uint16_t *)(runinfo->exitpc+2)) = (ECall_Replace) >> 16;
+    }
+
+
     uint64_t npc = infos->pc + 4;
     WriteTemp("0", npc);
     Load_regs(StoreIntRegAddr);

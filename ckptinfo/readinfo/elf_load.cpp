@@ -48,6 +48,8 @@ typedef struct {
 
 MemRangeInfo data_seg, text_seg;
 
+
+
 static inline int get_prot(uint32_t p_flags)
 {
   int prot_x = (p_flags & PF_X) ? PROT_EXEC  : PROT_NONE;
@@ -61,7 +63,7 @@ void replaceEcall(uint16_t *text, uint64_t length)
 {
     uint16_t data1 = 0x0000, data0 = 0x0073;
     //JmpTemp("1");//00106033
-    uint16_t pdata1 = 0x0010, pdata0 = 0x6033;
+    uint16_t pdata1 = (ECall_Replace) >> 16, pdata0 = (ECall_Replace)%65536;
     for(int i=0;i<length;i++) {
         if(text[i] == data0 && text[i+1] == data1){
             text[i] = pdata0;

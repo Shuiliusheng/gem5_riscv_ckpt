@@ -16,13 +16,19 @@
 #endif
 
 #define RunningInfoAddr 0x150000
-#define StoreIntRegAddr "0x150018"
-#define OldIntRegAddr   "0x150218"
+#define StoreIntRegAddr "0x150028"
+#define OldIntRegAddr   "0x150228"
 
 #define TakeOverAddrFalse 0x10666
 #define TakeOverAddrTrue 0x10666
 
+#define ECall_Replace 0x00106033
+#define Cause_ExitSysCall 1
+#define Cause_ExitInst 2
+
 typedef struct{
+    uint64_t exitpc;
+    uint64_t exit_cause;
     uint64_t syscall_info_addr;
     uint64_t nowcallnum;
     uint64_t totalcallnum;
