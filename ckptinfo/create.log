@@ -1,2 +1,0 @@
-build/RISCV/gem5.opt --debug-flag=ShowMemInfo,ShowRegInfo,ShowSyscall --debug-file=test1.log ./configs/example/se.py --ckptinsts=4000 -c ckptinfo/test/test1.riscv
-build/RISCV/gem5.opt --debug-flag=ShowMemInfo,ShowRegInfo,ShowSyscall --debug-file=main.log ./configs/example/se.py --ckptinsts=4000 -c ckptinfo/test/main

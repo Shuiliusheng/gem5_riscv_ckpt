@@ -1,7 +1,0 @@
-
-  build/RISCV/gem5.opt ./configs/example/se.py --ckptinsts=200000 -c ckptinfo/readckpt/readckpt.riscv --options="ckptinfo/info/test1_ckpt_20000.info ckptinfo/info/test1_ckpt_syscall_20000.info ckptinfo/test/test1.riscv"
-
-build/RISCV/gem5.opt ./configs/example/se.py --ckptinsts=300000 -c ckptinfo/readinfo/readinfo.riscv --options="ckptinfo/info/biginfo/ckpt_300000_600000.info ckptinfo/info/biginfo/ckpt_syscall_300000_600000.info ckptinfo/test/big.riscv"
-
-
-./configs/example/se.py --ckptinsts=300000 -c ckptinfo/readinfo/readinfo.riscv '--options=ckptinfo/info/biginfo/ckpt_300000_600000.info ckptinfo/info/biginfo/ckpt_syscall_300000_600000.info ckptinfo/test/big.riscv'
