@@ -51,6 +51,7 @@
 #include "debug/SimpleCPU.hh"
 #include "debug/ShowMemInfo.hh"
 #include "debug/ShowRegInfo.hh"
+#include "debug/ShowSyscall.hh"
 #include "debug/ShowDetail.hh"
 #include "mem/packet.hh"
 #include "mem/packet_access.hh"
@@ -92,6 +93,17 @@ AtomicSimpleCPU::AtomicSimpleCPU(const AtomicSimpleCPUParams &p)
     data_read_req = std::make_shared<Request>();
     data_write_req = std::make_shared<Request>();
     data_amo_req = std::make_shared<Request>();
+
+    ckpt_startinsts = p.ckpt_startinsts;
+    ckpt_endinsts = p.ckpt_endinsts;
+
+    if(ckpt_startinsts == 0){
+        startlog = true;
+        ::gem5::debug::ShowSyscall.enable();
+    }
+
+    printf("start ckpt: %d, end ckpt: %d\n", p.ckpt_startinsts, p.ckpt_endinsts);
+
 }
 
 
@@ -423,7 +435,7 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t *data, unsigned size,
                 assert(!locked);
                 locked = true;
             }
-            if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo)) { 
+            if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo) && startlog) { 
                 unsigned long long res = 0;
                 switch(size){
                     case 1: res = data[0]; break;
@@ -483,7 +495,7 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
         // This must be a cache block cleaning request
         data = zero_array;
     }
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo)) { 
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo) && startlog) { 
         unsigned long long res1 = 0;
         switch(size){
             case 1: res1 = data[0]; break;
@@ -660,7 +672,7 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
         return NoFault;
     }
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo)) { 
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo) && startlog) { 
         unsigned long long res1 = 0;
         switch(size){
             case 1: res1 = data[0]; break;
@@ -776,9 +788,7 @@ AtomicSimpleCPU::tick()
             Tick stall_ticks = 0;
             if (curStaticInst) {
                 
-                bool showlog = (t_info.numInst > ckptinsts-50) && (t_info.numInst < ckptinsts + 3100);
-
-                if((GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowDetail)) && showlog){
+                if((GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowDetail))){
                     DPRINTF(ShowDetail, "--------------- pc: 0x%lx --------------- %d \n", thread->pcState().pc(), t_info.numInst);
                     for(int i=0;i<curStaticInst->numSrcRegs();i++){
                         RegId src = curStaticInst->srcRegIdx(i);
@@ -794,18 +804,35 @@ AtomicSimpleCPU::tick()
 
                 if(curStaticInst->isSyscall()){
                     preinsts.clear();
-                    DPRINTF(ShowRegInfo, "{\"type\": \"isSyscall\", \"inst_num\": \"%d\", \"pc\": \"0x%lx\"}\n", t_info.numInst, thread->pcState().pc());
-                    if(thread->readIntReg(17) == 0x5e){
+                    if(startlog)
+                        DPRINTF(ShowRegInfo, "{\"type\": \"isSyscall\", \"inst_num\": \"%d\", \"pc\": \"0x%lx\"}\n", t_info.numInst, thread->pcState().pc());
+                    if(thread->readIntReg(17) == 0x5e && ckpt_endinsts == 0 && params().max_insts_any_thread == 0){
                         showCodeRange();
                     }
                 }
 
-                if(t_info.numInst!=0 && t_info.numInst % (30000000-10) ==0 ){
-                    showCodeRange();
-                }
-
                 if(t_info.numInst % 1000000 == 0){
                     printf("sim inst number: %d\n", t_info.numInst);
+                }
+
+                if(ckpt_startinsts!=0 && t_info.numInst >= ckpt_startinsts && t_info.numInst <= ckpt_endinsts){
+                    startlog = true;
+                    ::gem5::debug::ShowSyscall.enable();
+                }
+
+                if(ckpt_endinsts!=0 && t_info.numInst > ckpt_endinsts){
+                    startlog = false;
+                    ::gem5::debug::ShowSyscall.disable();
+                }
+
+                if(ckpt_endinsts!=0 && t_info.numInst == ckpt_endinsts){
+                    showCodeRange();
+                    exeinsts.clear();
+                }
+
+                if(ckpt_endinsts == 0 && params().max_insts_any_thread != 0 && t_info.numInst+10 == params().max_insts_any_thread){
+                    showCodeRange();
+                    exeinsts.clear();
                 }
 
                 fault = curStaticInst->execute(&t_info, traceData);
@@ -814,7 +841,7 @@ AtomicSimpleCPU::tick()
                 if (fault == NoFault) {
                     countInst();
                     ppCommit->notify(std::make_pair(thread, curStaticInst));
-                    if((GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowDetail)) && showlog){
+                    if((GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowDetail))){
                         for(int i=0;i<curStaticInst->numDestRegs();i++){
                             RegId dst = curStaticInst->destRegIdx(i);
                             DPRINTF(ShowDetail, "pc: 0x%lx, dst %d: 0x%lx\n", thread->pcState().pc(), dst.index(), thread->readIntReg(dst.index()));
@@ -827,7 +854,7 @@ AtomicSimpleCPU::tick()
                         }
                     }
 
-                    if ((t_info.numInst % ckptinsts == 0) && (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowRegInfo))) {
+                    if (( (t_info.numInst-ckpt_startinsts) % ckptinsts == 0) && (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowRegInfo)) && startlog) {
                         needshowFirst = true;
                         char str[3000];
                         sprintf(str, "{\"type\": \"int_regs\", \"inst_num\": \"%d\", \"inst_pc\": \"0x%llx\", \"npc\": \"0x%llx\", \"data\": [ ", t_info.numInst, thread->pcState().pc(), thread->nextInstAddr());
@@ -844,6 +871,7 @@ AtomicSimpleCPU::tick()
                         
                         preloads.clear();
                         prestores.clear();
+                        printf("create Ckpt, start with inst number: %ld\n", t_info.numInst);
 
                         // printf("ckpt place, exe number: %ld\n", exeinsts.size());
                         // showCodeRange();
@@ -854,7 +882,7 @@ AtomicSimpleCPU::tick()
                     }
                     bool isInPre = preinsts.find(thread->pcState().pc()) != preinsts.end();
                     bool isInPre1 = preinsts.find(thread->pcState().pc()+2) != preinsts.end(); //保证不是一条压缩指令的情况下, 下一条也不在
-                    if(!isInPre && needshowFirst && !isInPre1){
+                    if(!isInPre && needshowFirst && !isInPre1 && startlog){
                         DPRINTF(ShowRegInfo, "{\"type\": \"ckptExitInst\", \"inst_num\": \"%d\", \"inst_pc\": \"0x%lx\"}\n", t_info.numInst, thread->pcState().pc());
                         needshowFirst = false;
                     }    

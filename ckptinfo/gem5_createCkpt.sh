@@ -27,4 +27,4 @@ debugflags="ShowMemInfo,ShowRegInfo,ShowSyscall"
 
 echo "build/RISCV/gem5.opt --debug-flag=$debugflags --debug-file=$logfile ./configs/example/se.py --stackbase=$stacktop --mmapend=$mmapend --ckptinsts=$ckptinsts -c $bench $options"
 
-build/RISCV/gem5.opt --debug-flag=$debugflags --debug-file=$logfile ./configs/example/se.py --stackbase=$stacktop --mmapend=$mmapend --ckptinsts=$ckptinsts -c $bench "$options"
+build/RISCV/gem5.opt --debug-flag=$debugflags --debug-file=$logfile ./configs/example/se.py --startinsts=5000000 --endinsts=11000000 --stackbase=$stacktop --mmapend=$mmapend --ckptinsts=$ckptinsts -c $bench "$options"

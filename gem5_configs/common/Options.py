@@ -117,6 +117,9 @@ def addNoISAOptions(parser):
     parser.add_argument("--stackbase", type=int, default=0x7FFFFFFF)
     parser.add_argument("--mmapend", type=int, default=0x41000000)
 
+    parser.add_argument("--startinsts", action="store", type=int, default=None)
+    parser.add_argument("--endinsts", action="store", type=int, default=None)
+
     # Memory Options
     parser.add_argument("--list-mem-types",
                         action=ListMem, nargs=0,

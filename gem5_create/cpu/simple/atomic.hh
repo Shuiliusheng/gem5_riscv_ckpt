@@ -71,10 +71,12 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     void init() override;
 
     unsigned long long tempregs[32];
+    unsigned long long ckpt_startinsts, ckpt_endinsts;
 
     bool startshow = false;
-
     bool needshowFirst = false;
+    bool startlog = false;
+
 
     set<Addr> preinsts;
     set<Addr> exeinsts;

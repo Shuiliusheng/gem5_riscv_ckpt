@@ -62,6 +62,9 @@ class AtomicSimpleCPU(BaseSimpleCPU):
     simulate_data_stalls = Param.Bool(False, "Simulate dcache stall cycles")
     simulate_inst_stalls = Param.Bool(False, "Simulate icache stall cycles")
 
+    ckpt_startinsts = Param.Counter(0, "start record ckpt log information")
+    ckpt_endinsts = Param.Counter(0, "exit record ckpt log information")
+
     def addSimPointProbe(self, interval):
         simpoint = SimPoint()
         simpoint.interval = interval
