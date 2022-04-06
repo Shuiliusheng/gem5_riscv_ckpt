@@ -830,9 +830,9 @@ AtomicSimpleCPU::tick()
                 RegId rtemp = curStaticInst->srcRegIdx(1);
                 if(inst_str.find("or") != std::string::npos && inst_str.find("amo") == std::string::npos){
                     TheISA::PCState pcState = thread->pcState();
-                    if(rtemp.index() == 1){
-                        printf("simInstNum: %d, ecall pc: 0x%lx\n", simInstNum, pcState.pc());
-                    }
+                    // if(rtemp.index() == 1){
+                    //     printf("simInstNum: %d, ecall pc: 0x%lx\n", simInstNum, pcState.pc());
+                    // }
                     pcState.set(tempregs[rtemp.index()]);
                     thread->pcState(pcState);
                     startshow = true;

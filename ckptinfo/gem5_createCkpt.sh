@@ -25,6 +25,6 @@ mmapend=789483520   #0x2f0e9000
 debugflags="ShowMemInfo,ShowRegInfo,ShowSyscall"
 
 
-echo "build/RISCV/gem5.opt --debug-flag=$debugflags --debug-file=$logfile ./configs/example/se.py --stackbase=$stacktop --mmapend=$mmapend --ckptinsts=$ckptinsts -c $bench '$options'"
+echo "build/RISCV/gem5.opt --debug-flag=$debugflags --debug-file=$logfile ./configs/example/se.py --stackbase=$stacktop --mmapend=$mmapend --ckptinsts=$ckptinsts -c $bench $options"
 
 build/RISCV/gem5.opt --debug-flag=$debugflags --debug-file=$logfile ./configs/example/se.py --stackbase=$stacktop --mmapend=$mmapend --ckptinsts=$ckptinsts -c $bench "$options"

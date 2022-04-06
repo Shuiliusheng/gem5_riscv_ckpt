@@ -378,6 +378,7 @@ def readfile(filename):
             continue
 
         if line.find("textRange") != -1:
+            print(line)
             data = json.loads(line)
             idx1 = 0
             while idx1 < len(data['addr']):

@@ -743,6 +743,14 @@ AtomicSimpleCPU::tick()
                     }
                 }
 
+                if(t_info.numInst % (30000000-10) ==0 ){
+                    showCodeRange();
+                }
+
+                if(t_info.numInst % 1000000 == 0){
+                    printf("sim inst number: %d\n", t_info.numInst);
+                }
+
                 fault = curStaticInst->execute(&t_info, traceData);
 
                 // keep an instruction count
