@@ -79,6 +79,9 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     set<Addr> preinsts;
     set<Addr> exeinsts;
 
+    set<Addr> preloads;
+    set<Addr> prestores;
+
     void showCodeRange(){
       vector<Addr> insts;
       set<Addr>::iterator iter;

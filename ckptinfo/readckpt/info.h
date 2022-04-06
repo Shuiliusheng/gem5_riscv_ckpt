@@ -20,7 +20,7 @@
 #define OldIntRegAddr   "0x150228"
 
 #define TakeOverAddrFalse 0x10666
-#define TakeOverAddrTrue 0x10666
+#define TakeOverAddrTrue 0x1066a
 
 #define ECall_Replace 0x00106033
 #define Cause_ExitSysCall 1

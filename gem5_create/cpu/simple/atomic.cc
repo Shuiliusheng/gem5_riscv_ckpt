@@ -431,7 +431,29 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t *data, unsigned size,
                     case 4: res = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24); break;
                     case 8: res = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24) + ((unsigned long long)data[4] <<32) + ((unsigned long long)data[5] << 40) + ((unsigned long long)data[6] << 48) + ((unsigned long long)data[7] << 56); break;
                 }
-                DPRINTF(ShowMemInfo, "{\"type\": \"mem_read\", \"addr\": \"0x%llx\", \"size\": \"0x%x\", \"data\": \"0x%llx\"}\n", thread->pcState().pc(), addr, size, res);
+                bool needlog = false;
+                int i=0;
+                unsigned long long ta;
+                for(i=0; i<size; i++){
+                    ta = addr + i;
+                    if(prestores.find(ta) == prestores.end()){ //没找到前面有store，则退出循环
+                        needlog = true; //此时认为该load有可能是first load，因为没有被store完全覆盖
+                        break;
+                    }
+                }
+                if(needlog){ //此时继续判断是否为first load
+                    needlog = false;
+                    for(i=0; i<size; i++){
+                        ta = addr + i;
+                        if(preloads.find(ta) == preloads.end()){ //没找到前面有load到该地址，则退出循环
+                            needlog = true; //此时认为该load是first load，因此之前的load并没有完全覆盖它
+                            preloads.insert(ta); //将本身的地址记录下来
+                        }
+                    }
+                }
+                if(needlog){
+                    DPRINTF(ShowMemInfo, "{\"type\": \"mem_read\", \"addr\": \"0x%llx\", \"size\": \"0x%x\", \"data\": \"0x%llx\"}\n", addr, size, res);
+                }
             }
             return fault;
         }
@@ -469,7 +491,19 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
             case 4: res1 = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24); break;
             case 8: res1 = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24) + ((unsigned long long)data[4] <<32) + ((unsigned long long)data[5] << 40) + ((unsigned long long)data[6] << 48) + ((unsigned long long)data[7] << 56); break;
         }
-        DPRINTF(ShowMemInfo, "{\"type\": \"mem_write\", \"addr\": \"0x%llx\", \"size\": \"0x%x\"}\n", addr, size);
+
+        bool needlog = false;
+        int i=0;
+        unsigned long long ta;
+        for(i=0; i<size; i++){
+            ta = addr + i;
+            if(prestores.find(ta) == prestores.end()){  
+                needlog = true; //即发现前面没有完全store了该地址
+                prestores.insert(ta);
+            }
+        }
+        if(needlog)
+            DPRINTF(ShowMemInfo, "{\"type\": \"mem_write\", \"addr\": \"0x%llx\", \"size\": \"0x%x\"}\n", addr, size);
     }
 
     // use the CPU's statically allocated write request and packet objects
@@ -634,7 +668,30 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
             case 4: res1 = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24); break;
             case 8: res1 = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24) + ((unsigned long long)data[4] <<32) + ((unsigned long long)data[5] << 40) + ((unsigned long long)data[6] << 48) + ((unsigned long long)data[7] << 56); break;
         }
-        DPRINTF(ShowMemInfo, "{\"type\": \"mem_atomic\", \"addr\": \"0x%llx\", \"size\": \"0x%x\", \"data\": \"0x%llx\"}\n", thread->pcState().pc(), addr, size, res1);
+
+        bool needlog = false;
+        int i=0;
+        unsigned long long ta;
+        for(i=0; i<size; i++){
+            ta = addr + i;
+            if(prestores.find(ta) == prestores.end()){ //没找到前面有store，则退出循环
+                needlog = true; //此时认为该atomic有可能是first load，因为没有被store完全覆盖
+                break;
+            }
+        }
+        if(needlog){ //此时继续判断是否为first load
+            needlog = false;
+            for(i=0; i<size; i++){
+                ta = addr + i;
+                if(preloads.find(ta) == preloads.end()){ //没找到前面有load到该地址，则退出循环
+                    needlog = true; //此时认为该atomic是first load，因此之前的load并没有完全覆盖它
+                    preloads.insert(ta); //将本身的地址记录下来
+                }
+            }
+        }
+        if(needlog){
+            DPRINTF(ShowMemInfo, "{\"type\": \"mem_atomic\", \"addr\": \"0x%llx\", \"size\": \"0x%x\", \"data\": \"0x%llx\"}\n", addr, size, res1);
+        }
     }
 
     //If there's a fault and we're not doing prefetch, return it
@@ -743,7 +800,7 @@ AtomicSimpleCPU::tick()
                     }
                 }
 
-                if(t_info.numInst % (30000000-10) ==0 ){
+                if(t_info.numInst!=0 && t_info.numInst % (30000000-10) ==0 ){
                     showCodeRange();
                 }
 
@@ -784,7 +841,11 @@ AtomicSimpleCPU::tick()
                             sprintf(str, "%s\"0x%llx\", ", str, thread->readFloatReg(i));
                         }
                         DPRINTF(ShowRegInfo, "%s\"0x%llx\" ]}\n", str, thread->readFloatReg(31));
-                        printf("ckpt place, exe number: %ld\n", exeinsts.size());
+                        
+                        preloads.clear();
+                        prestores.clear();
+
+                        // printf("ckpt place, exe number: %ld\n", exeinsts.size());
                         // showCodeRange();
                         // for(iter = exeinsts.begin() ; iter != exeinsts.end() ; ++iter) {
                         //     printf("pc: 0x%lx\n", *iter);
