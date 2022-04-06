@@ -431,7 +431,7 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t *data, unsigned size,
                     case 4: res = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24); break;
                     case 8: res = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24) + ((unsigned long long)data[4] <<32) + ((unsigned long long)data[5] << 40) + ((unsigned long long)data[6] << 48) + ((unsigned long long)data[7] << 56); break;
                 }
-                DPRINTF(ShowMemInfo, "{\"type\": \"mem_read\", \"pc\": \"0x%llx\", \"addr\": \"0x%llx\", \"size\": \"0x%x\", \"data\": \"0x%llx\"}\n", thread->pcState().pc(), addr, size, res);
+                DPRINTF(ShowMemInfo, "{\"type\": \"mem_read\", \"addr\": \"0x%llx\", \"size\": \"0x%x\", \"data\": \"0x%llx\"}\n", thread->pcState().pc(), addr, size, res);
             }
             return fault;
         }
@@ -469,7 +469,7 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
             case 4: res1 = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24); break;
             case 8: res1 = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24) + ((unsigned long long)data[4] <<32) + ((unsigned long long)data[5] << 40) + ((unsigned long long)data[6] << 48) + ((unsigned long long)data[7] << 56); break;
         }
-        DPRINTF(ShowMemInfo, "{\"type\": \"mem_write\", \"pc\": \"0x%llx\", \"addr\": \"0x%llx\", \"size\": \"0x%x\", \"data\": \"0x%llx\"}\n", thread->pcState().pc(), addr, size, res1);
+        DPRINTF(ShowMemInfo, "{\"type\": \"mem_write\", \"addr\": \"0x%llx\", \"size\": \"0x%x\"}\n", addr, size);
     }
 
     // use the CPU's statically allocated write request and packet objects
@@ -634,7 +634,7 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
             case 4: res1 = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24); break;
             case 8: res1 = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24) + ((unsigned long long)data[4] <<32) + ((unsigned long long)data[5] << 40) + ((unsigned long long)data[6] << 48) + ((unsigned long long)data[7] << 56); break;
         }
-        DPRINTF(ShowMemInfo, "{\"type\": \"mem_atomic\", \"pc\": \"0x%llx\", \"addr\": \"0x%llx\", \"size\": \"0x%x\", \"data\": \"0x%llx\"}\n", thread->pcState().pc(), addr, size, res1);
+        DPRINTF(ShowMemInfo, "{\"type\": \"mem_atomic\", \"addr\": \"0x%llx\", \"size\": \"0x%x\", \"data\": \"0x%llx\"}\n", thread->pcState().pc(), addr, size, res1);
     }
 
     //If there's a fault and we're not doing prefetch, return it
