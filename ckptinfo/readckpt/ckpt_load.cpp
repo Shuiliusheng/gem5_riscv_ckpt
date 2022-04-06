@@ -89,7 +89,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     MemRangeInfo *minfos = (MemRangeInfo *)malloc(sizeof(MemRangeInfo)*mrange_num);
     fread(&minfos[0], sizeof(MemRangeInfo), mrange_num, p);
     for(int i=0;i<mrange_num;i++){
-        //fread(&memrange, sizeof(memrange), 1, p);
+        printf("load range: %d\r", i);
         memrange = minfos[i];
         extra.size = 0;
         extra.addr = 0;
