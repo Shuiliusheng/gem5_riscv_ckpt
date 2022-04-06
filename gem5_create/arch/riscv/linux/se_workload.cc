@@ -117,6 +117,27 @@ unameFunc64(SyscallDesc *desc, ThreadContext *tc, VPtr<Linux::utsname> name)
     strcpy(name->version, "#1 Mon Aug 18 11:32:15 EDT 2003");
     strcpy(name->machine, "riscv64");
 
+    Linux::utsname unametemp;
+    strcpy(unametemp.sysname, "Linux");
+    strcpy(unametemp.nodename,"sim.gem5.org");
+    strcpy(unametemp.release, process->release.c_str());
+    strcpy(unametemp.version, "#1 Mon Aug 18 11:32:15 EDT 2003");
+    strcpy(unametemp.machine, "riscv64");
+
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+        unsigned outsize = sizeof(Linux::utsname); 
+        unsigned char *outdata = (unsigned char *)(&unametemp);
+        unsigned long long dstaddr = tc->readIntReg(10);
+        unsigned long long res = 0;
+        char *str = (char *)malloc(1000 + outsize*8); //
+        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        for(int i=0;i<outsize-1;i++){
+            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        }
+        DPRINTF1(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        free(str);
+    }
+
     return 0;
 }
 

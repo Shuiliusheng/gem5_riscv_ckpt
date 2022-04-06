@@ -303,13 +303,16 @@ def process(end, reginfo, meminfo, syscallinfo, textinfo, exitinfo):
     exitinfo.show()
     print("ckpt sim inst number: ", exitinfo.inst_num - int(startpoint.inst_num, 10))
     print("text range info: ", len(textinfo))
-    for text in textinfo:
-        text.show()
+    # for text in textinfo:
+    #     text.show()
     print("mem range info: ", len(memrange))
-    for mem in memrange:
-        mem.show()
+    # for mem in memrange:
+    #     mem.show()
     print("syscall number: ", len(syscallinfos))
+    for syscall in syscallinfos:
+        syscall.show()
     print("first load number: ", len(loadinfo))
+
 
 
 def findexit(file1, meminfo, reginfo, syscallinfo, textinfo, sysplace, end):

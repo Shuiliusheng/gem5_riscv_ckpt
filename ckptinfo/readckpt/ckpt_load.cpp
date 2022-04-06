@@ -28,7 +28,9 @@ void read_ckptsyscall(char filename[])
     fseek(fp, 0, SEEK_SET);
 
     allocsize = filesize + (4096-filesize%4096);
-    alloc_vaddr = (uint64_t)mmap((void *)0x2000000, allocsize, PROT_READ | PROT_WRITE, MAP_PRIVATE|MAP_ANON|MAP_FIXED, -1, 0);    
+    alloc_vaddr = (uint64_t)mmap((void *)0x2000000, allocsize, PROT_READ | PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, 0);    
+
+    printf("ckptsyscall file alloc_vaddr: 0x%lx\n", alloc_vaddr);
     
     if (fread((void *)alloc_vaddr, filesize, 1, fp) != 1) {
         printf("cannot read file: %s\n", filename);
@@ -84,10 +86,11 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     //step 3: read memory range information and map these ranges
     fread(&mrange_num, 8, 1, p);
     printf("--- step 3, read memory range information and do map, range num: %d ---\n", mrange_num);
-
+    MemRangeInfo *minfos = (MemRangeInfo *)malloc(sizeof(MemRangeInfo)*mrange_num);
+    fread(&minfos[0], sizeof(MemRangeInfo), mrange_num, p);
     for(int i=0;i<mrange_num;i++){
-        fread(&memrange, sizeof(memrange), 1, p);
-
+        //fread(&memrange, sizeof(memrange), 1, p);
+        memrange = minfos[i];
         extra.size = 0;
         extra.addr = 0;
         uint64_t msaddr = memrange.addr, meaddr = memrange.addr + memrange.size;
@@ -113,7 +116,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
         if(memrange.size !=0){
             if(memrange.addr < 0xfffffffff){ // a small limit
                 int* arr = static_cast<int*>(mmap((void *)memrange.addr, memrange.size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, 0, 0));
-                if(ShowLog)
+                if(memrange.addr != (uint64_t)arr)
                     printf("map range: (0x%lx, 0x%lx), mapped addr: 0x%lx\n", memrange.addr, memrange.addr + memrange.size, arr);
                 assert(memrange.addr == (uint64_t)arr);  
             }
@@ -130,18 +133,18 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     //step 4: read first load information, and store these data to memory
     fread(&loadnum, 8, 1, p);
     printf("--- step 4, read first load information and init these loads, load num: %d ---\n", loadnum);
-    for(int i=0;i<loadnum;i++){
-        fread(&loadinfo, sizeof(loadinfo), 1, p);
-        if(loadinfo.addr < 0xfffffffff){ //防止写入到栈中，影响程序执行  
-            switch(loadinfo.size) {
-                case 1: *((uint8_t *)loadinfo.addr) = (uint8_t)loadinfo.data; break;
-                case 2: *((uint16_t *)loadinfo.addr) = (uint16_t)loadinfo.data; break;
-                case 4: *((uint32_t *)loadinfo.addr) = (uint32_t)loadinfo.data; break;
-                case 8: *((uint64_t *)loadinfo.addr) = loadinfo.data; break;
-            }
+    LoadInfo *linfos = (LoadInfo *)malloc(sizeof(LoadInfo)*loadnum);
+    fread(&linfos[0], sizeof(LoadInfo), loadnum, p);
+    for(int j=0;j<loadnum;j++){
+	    switch(linfos[j].size) {
+	        case 1: *((uint8_t *)linfos[j].addr) = (uint8_t)linfos[j].data; break;
+            case 2: *((uint16_t *)linfos[j].addr) = (uint16_t)linfos[j].data; break;
+	        case 4: *((uint32_t *)linfos[j].addr) = (uint32_t)linfos[j].data; break;
+	        case 8: *((uint64_t *)linfos[j].addr) = linfos[j].data; break;
         }
     }
     fclose(p);
+    free(linfos);
     
     //step5: 加载syscall的执行信息到内存中
     read_ckptsyscall(ckpt_sysinfo);

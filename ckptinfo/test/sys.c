@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
+#include <sys/utsname.h>
 
 int main()
 {
@@ -22,6 +23,12 @@ int main()
 
 	a[1]=10;
 	a[2]=11;
+
+	struct utsname testbuff;
+	printf("testbuff addr: 0x%lx\n", &testbuff);
+	if( uname(&testbuff) >=0 )
+		printf(" sysname:%s\n nodename:%s\n release:%s\n version:%s\n machine:%s\n \n ", testbuff.sysname, testbuff.nodename, testbuff.release,testbuff.version, testbuff.machine);
+
 
 	struct stat buf;
 	int fd;

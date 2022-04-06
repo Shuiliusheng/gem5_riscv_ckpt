@@ -21,10 +21,13 @@ logfile="$basename.log"
 stacktop=801017856  #0x2fbe9000
 mmapend=789483520   #0x2f0e9000
 
+maxinsts=500000000
+startinsts=200000000
+endinsts=450000000
 
 debugflags="ShowMemInfo,ShowRegInfo,ShowSyscall"
 
 
 echo "build/RISCV/gem5.opt --debug-flag=$debugflags --debug-file=$logfile ./configs/example/se.py --stackbase=$stacktop --mmapend=$mmapend --ckptinsts=$ckptinsts -c $bench $options"
 
-build/RISCV/gem5.opt --debug-flag=$debugflags --debug-file=$logfile ./configs/example/se.py --startinsts=5000000 --endinsts=11000000 --stackbase=$stacktop --mmapend=$mmapend --ckptinsts=$ckptinsts -c $bench "$options"
+build/RISCV/gem5.opt --debug-flag=$debugflags --debug-file=$logfile ./configs/example/se.py --maxinsts=$maxinsts --startinsts=$startinsts --endinsts=$endinsts --stackbase=$stacktop --mmapend=$mmapend --ckptinsts=$ckptinsts -c $bench "$options"

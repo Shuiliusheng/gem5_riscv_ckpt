@@ -737,6 +737,10 @@ AtomicSimpleCPU::tick()
                 }
 
                 
+                // if(simInstNum % 1000000 == 0 && thread->pcState().pc() > 0x200000 ){
+                //     printf("-----pc: 0x%lx -- %d \n", thread->pcState().pc(), simInstNum);
+                // }
+
 
                 if((GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowDetail)) && startshow){// 
                     DPRINTF(ShowDetail, "--------------- pc: 0x%lx --------------- %d \n", thread->pcState().pc(), simInstNum);
@@ -799,6 +803,9 @@ AtomicSimpleCPU::tick()
 
                 postExecute();
             }
+            if(t_info.numInst % 1000000 == 0){
+                printf("sim inst number: %d, test program sim inst: %d\n", t_info.numInst, simInstNum);
+            }
 
             // @todo remove me after debugging with legion done
             if (curStaticInst && (!curStaticInst->isMicroop() ||
@@ -835,7 +842,6 @@ AtomicSimpleCPU::tick()
                     // }
                     pcState.set(tempregs[rtemp.index()]);
                     thread->pcState(pcState);
-                    startshow = true;
                 }
             }
         }

@@ -786,8 +786,7 @@ AtomicSimpleCPU::tick()
             preExecute();
 
             Tick stall_ticks = 0;
-            if (curStaticInst) {
-                
+            if (curStaticInst) {       
                 if((GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowDetail))){
                     DPRINTF(ShowDetail, "--------------- pc: 0x%lx --------------- %d \n", thread->pcState().pc(), t_info.numInst);
                     for(int i=0;i<curStaticInst->numSrcRegs();i++){
@@ -812,18 +811,9 @@ AtomicSimpleCPU::tick()
                 }
 
                 if(t_info.numInst % 1000000 == 0){
-                    printf("sim inst number: %d\n", t_info.numInst);
+                    printf("-----pc: 0x%lx -- simInsts: %d \n", thread->pcState().pc(), t_info.numInst);
                 }
 
-                if(ckpt_startinsts!=0 && t_info.numInst >= ckpt_startinsts && t_info.numInst <= ckpt_endinsts){
-                    startlog = true;
-                    ::gem5::debug::ShowSyscall.enable();
-                }
-
-                if(ckpt_endinsts!=0 && t_info.numInst > ckpt_endinsts){
-                    startlog = false;
-                    ::gem5::debug::ShowSyscall.disable();
-                }
 
                 if(ckpt_endinsts!=0 && t_info.numInst == ckpt_endinsts){
                     showCodeRange();
@@ -841,7 +831,7 @@ AtomicSimpleCPU::tick()
                 if (fault == NoFault) {
                     countInst();
                     ppCommit->notify(std::make_pair(thread, curStaticInst));
-                    if((GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowDetail))){
+                    if((GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowDetail)) && startshow){
                         for(int i=0;i<curStaticInst->numDestRegs();i++){
                             RegId dst = curStaticInst->destRegIdx(i);
                             DPRINTF(ShowDetail, "pc: 0x%lx, dst %d: 0x%lx\n", thread->pcState().pc(), dst.index(), thread->readIntReg(dst.index()));
@@ -852,6 +842,16 @@ AtomicSimpleCPU::tick()
                                 DPRINTF(ShowDetail, "r%d: 0x%lx\n", i, thread->readIntReg(i));
                             }
                         }
+                    }
+
+                    if(ckpt_startinsts!=0 && t_info.numInst >= ckpt_startinsts && t_info.numInst <= ckpt_endinsts){
+                        startlog = true;
+                        ::gem5::debug::ShowSyscall.enable();
+                    }
+
+                    if(ckpt_endinsts!=0 && t_info.numInst > ckpt_endinsts){
+                        startlog = false;
+                        ::gem5::debug::ShowSyscall.disable();
                     }
 
                     if (( (t_info.numInst-ckpt_startinsts) % ckptinsts == 0) && (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowRegInfo)) && startlog) {
