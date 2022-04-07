@@ -18,7 +18,7 @@ typedef struct {
   int prot;
 } vmr_t;
 
-#define MAX_VMR (RISCV_PGSIZE / sizeof(vmr_t))
+#define MAX_VMR (RISCV_PGSIZE*100 / sizeof(vmr_t))
 static spinlock_t vm_lock = SPINLOCK_INIT;
 static vmr_t* vmrs;
 
@@ -37,13 +37,23 @@ static uintptr_t __page_alloc()
   return addr;
 }
 
+static uintptr_t __page_alloc1()
+{
+  kassert(next_free_page != free_pages);
+
+  uintptr_t addr = first_free_page + RISCV_PGSIZE * 100 * next_free_page;
+  next_free_page = next_free_page + 100;
+  memset((void*)addr, 0, RISCV_PGSIZE*100);
+  return addr;
+}
+
 static vmr_t* __vmr_alloc(uintptr_t addr, size_t length, file_t* file,
                           size_t offset, unsigned refcnt, int prot)
 {
   if (!vmrs) {
     spinlock_lock(&vm_lock);
       if (!vmrs) {
-        vmr_t* page = (vmr_t*)__page_alloc();
+        vmr_t* page = (vmr_t*)__page_alloc1();
         mb();
         vmrs = page;
       }
@@ -245,8 +255,11 @@ uintptr_t __do_mmap(uintptr_t addr, size_t length, int prot, int flags, file_t* 
     
   // printk("do map 1: 0x%lx\n", addr);
   vmr_t* v = __vmr_alloc(addr, length, f, offset, npage, prot);
-  if (!v)
+  if (!v){
+    printk("__vmr_alloc failed \n");
     return (uintptr_t)-1;
+  }
+    
 
   // printk("do map 2: 0x%lx\n", addr);
   for (uintptr_t a = addr; a < addr + length; a += RISCV_PGSIZE)
