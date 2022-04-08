@@ -35,6 +35,12 @@ typedef struct{
     uint64_t intregs[32];
     uint64_t fpregs[32];
     uint64_t oldregs[32];
+    uint64_t cycles;
+    uint64_t insts;
+    uint64_t lastcycles;
+    uint64_t lastinsts;
+    uint64_t startcycles;
+    uint64_t startinsts;
 }RunningInfo;
 
 typedef struct{
@@ -228,6 +234,17 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[]);
     "fence  \n\t"   \
 ); 
 
+#define DEFINE_CSRR(s)                     \
+    static inline uint64_t __csrr_##s()    \
+    {                                      \
+        uint64_t value;                    \
+        __asm__ volatile("csrr    %0, " #s \
+                         : "=r"(value)     \
+                         :);               \
+        return value;                      \
+    }
 
+DEFINE_CSRR(cycle)
+DEFINE_CSRR(instret)
 
 #endif
