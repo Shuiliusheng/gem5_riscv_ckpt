@@ -77,6 +77,9 @@ uint64_t loadelf(char * progname, char *ckptinfo)
 	Elf64_Ehdr ehdr;
 	Elf64_Phdr phdr;
     uint64_t startvaddr;
+    uint64_t cycles[2], insts[2];
+    cycles[0] = __csrr_cycle();
+    insts[0] = __csrr_instret();
 
     FILE *fp1 = fopen(ckptinfo, "rb");
     if (fp1 == NULL) {
@@ -143,10 +146,11 @@ uint64_t loadelf(char * progname, char *ckptinfo)
 
             //仅加载被使用到的代码段
             for(int i=0;i<numinfos;i++){
+                printf("load text range: %d\r", i);
                 fread(&textinfo, sizeof(MemRangeInfo), 1, fp1);
                 unsigned int offset = textinfo.addr - phdr.p_vaddr + phdr.p_offset;
                 fseek(fp, offset, SEEK_SET);
-                printf("load text segment, addr: 0x%lx, size: 0x%lx, end: 0x%lx\n", textinfo.addr, textinfo.size, textinfo.addr + textinfo.size);
+                // printf("load text segment, addr: 0x%lx, size: 0x%lx, end: 0x%lx\n", textinfo.addr, textinfo.size, textinfo.addr + textinfo.size);
                 fread((void *)textinfo.addr, textinfo.size, 1, fp);
                 replaceEcall((uint16_t *)textinfo.addr, textinfo.size/2);
             }
@@ -184,5 +188,9 @@ uint64_t loadelf(char * progname, char *ckptinfo)
 	}
     fclose(fp);
     fclose(fp1);
+    cycles[1] = __csrr_cycle();
+    insts[1] = __csrr_instret();
+
+    printf("load elf running info, cycles: %ld, insts: %ld\n", cycles[1]-cycles[0], insts[1]-insts[0]);
     return startvaddr;
 }

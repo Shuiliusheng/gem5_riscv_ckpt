@@ -57,7 +57,10 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     LoadInfo loadinfo;
     SimInfo siminfo;
     RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
-    
+    uint64_t cycles[2], insts[2];
+    cycles[0] = __csrr_cycle();
+    insts[0] = __csrr_instret();
+
     FILE *p=NULL;
     p = fopen(ckptinfo,"rb");
     if(p == NULL){
@@ -156,6 +159,10 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
         *((uint16_t *)(runinfo->exitpc+2)) = (ECall_Replace) >> 16;
     }
 
+    cycles[1] = __csrr_cycle();
+    insts[1] = __csrr_instret();
+    printf("load ckpt running info, cycles: %ld, insts: %ld\n", cycles[1]-cycles[0], insts[1]-insts[0]);
+
     //step6: init npc and takeover_syscall addr to temp register
     printf("--- step 6, init npc to rtemp(5) and takeover_syscall addr to rtemp(6) ---\n");
     WriteTemp("0", npc);
@@ -165,6 +172,13 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     //step7: save registers data of boot program 
     printf("--- step 789, save registers data of boot program, set testing program registers, start testing ---\n");
     Save_int_regs(OldIntRegAddr);
+
+    runinfo->cycles = 0;
+    runinfo->insts = 0;
+    runinfo->lastcycles = __csrr_cycle();
+    runinfo->lastinsts = __csrr_instret();
+    runinfo->startcycles = __csrr_cycle();
+    runinfo->startinsts = __csrr_instret();
 
     //step8: set the testing program's register information
     Load_regs(StoreIntRegAddr);
