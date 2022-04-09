@@ -31,6 +31,7 @@
 #include "arch/riscv/types.hh"
 #include "base/bitfield.hh"
 #include "debug/Decode.hh"
+#include "debug/TempInst.hh"
 
 namespace gem5
 {
@@ -87,9 +88,58 @@ Decoder::decode(ExtMachInst mach_inst, Addr addr)
     DPRINTF(Decode, "Decoding instruction 0x%08x at address %#x\n",
             mach_inst, addr);
 
+    //add x0, rd, rtemp: read temp,     op = 0x33, func7 = 0, func3 = 0
+    //sub x0, rs1, rtemp: write temp,   op = 0x33, func7 = 0x40, func3 = 0
+    //or x0, x0, rtemp: jmp rtemp,      op = 0x33, func7 = 0, func3 = 6
+
+    unsigned int taddinst = 0x80b3; //add rd (1), rs1(1), rs2(0)
+    unsigned int tjalrinst = 0x8067; //jalr rd(0), rs1(1), 0
+    ExtMachInst old_mach_inst = mach_inst;
+
+    unsigned int opcode = 0, rs1 = 0, rs2 = 0, rd = 1, func7 = 0, func3 = 0;
+    bool isRTemp = false, isWTemp = false, isJTemp = false;
+    if (!compressed(emi)) {
+        opcode = mach_inst % 128;
+        func7 = mach_inst >> 25;
+        func3 = (mach_inst >> 12) % 8;
+        rs1 = (mach_inst >> 15) % 32;
+        rs2 = (mach_inst >> 20) % 32;
+        rd = (mach_inst >> 7) % 32;
+
+        isRTemp = (opcode == 0x33) && (func7 == 0)  && (func3 == 0) && (rd == 0);
+        isWTemp = (opcode == 0x33) && (func7 == 0x20) && (func3 == 0) && (rd == 0);
+        isJTemp = (opcode == 0x33) && (func7 == 0)  && (func3 == 6) && (rd == 0);
+    }
+    
+    if(isRTemp || isWTemp){
+        mach_inst = taddinst;
+    }
+    else if(isJTemp){
+        mach_inst = tjalrinst;
+    }
+
     StaticInstPtr &si = instMap[mach_inst];
-    if (!si)
+    if (!si || isRTemp || isWTemp || isJTemp){ //如果是临时指令，则不从cache中取，而是直接重新译码
         si = decodeInst(mach_inst);
+    }  
+
+    if(isRTemp) {
+        si->setSrcRegIdx(0, RegId(IntRegClass, rs2+32));
+        si->setDestRegIdx(0, RegId(IntRegClass, rs1));
+    }
+    else if(isWTemp) {
+        si->setSrcRegIdx(0, RegId(IntRegClass, rs1));
+        si->setDestRegIdx(0, RegId(IntRegClass, rs2+32));
+    }
+    else if(isJTemp) {
+        si->setSrcRegIdx(0, RegId(IntRegClass, rs2+32));
+    }
+
+    if(isRTemp || isWTemp || isJTemp){
+        StaticInstPtr tsi = decodeInst(old_mach_inst);
+        DPRINTF(TempInst, "Decode: Temp Inst, addr: 0x%lx, inst: 0x%lx, %s, R: %d, W: %d, J: %d, rs1: %d, rs2: %d\n", addr, old_mach_inst, tsi->disassemble(addr).c_str(), isRTemp, isWTemp, isJTemp, rs1, rs2);
+        DPRINTF(TempInst, "Decode: Decoded Temp %s instruction: %#x, %s\n", si->getName(), mach_inst, si->disassemble(addr).c_str());
+    }
 
     DPRINTF(Decode, "Decode: Decoded %s instruction: %#x\n",
             si->getName(), mach_inst);

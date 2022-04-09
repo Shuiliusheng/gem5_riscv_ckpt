@@ -139,6 +139,9 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     LoadInfo *linfos = (LoadInfo *)malloc(sizeof(LoadInfo)*loadnum);
     fread(&linfos[0], sizeof(LoadInfo), loadnum, p);
     for(int j=0;j<loadnum;j++){
+	    if(j%100==0){
+		    printf("load %d\r", j);
+	    }
 	    switch(linfos[j].size) {
 	        case 1: *((uint8_t *)linfos[j].addr) = (uint8_t)linfos[j].data; break;
             case 2: *((uint16_t *)linfos[j].addr) = (uint16_t)linfos[j].data; break;
