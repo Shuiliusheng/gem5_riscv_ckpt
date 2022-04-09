@@ -719,30 +719,8 @@ AtomicSimpleCPU::tick()
             if (curStaticInst) {
 
                 bool ecall = false;
-                if(curStaticInst->numSrcRegs() == 2 && curStaticInst->numDestRegs() == 1 && curStaticInst->destRegIdx(0).index() == 0) {
-                    const std::string inst_str = curStaticInst->disassemble(thread->pcState().pc());                    
-                    RegId rs1 = curStaticInst->srcRegIdx(0);
-                    RegId rtemp = curStaticInst->srcRegIdx(1);
-                    if(inst_str.find("sub") != std::string::npos && inst_str.find("amo") == std::string::npos){
-                        tempregs[rtemp.index()] = thread->readIntReg(rs1.index());
-                        // printf("special inst: write 0x%lx (r%d) to rtemp %d \n", thread->readIntReg(rs1.index()), rs1.index(), rtemp.index());
-                    }
-                    else if(inst_str.find("add") != std::string::npos && inst_str.find("amo") == std::string::npos){
-                        thread->setIntReg(rs1.index(), tempregs[rtemp.index()]);
-                        // printf("special inst: read 0x%lx (rtemp %d) to r%d, \n", tempregs[rtemp.index()], rtemp.index(), rs1.index());
-                    }
-                    else if(inst_str.find("or") != std::string::npos && inst_str.find("amo") == std::string::npos){
-                        ecall = true;
-                    }
-                }
 
-                
-                // if(simInstNum % 1000000 == 0 && thread->pcState().pc() > 0x200000 ){
-                //     printf("-----pc: 0x%lx -- %d \n", thread->pcState().pc(), simInstNum);
-                // }
-
-
-                if((GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowDetail)) && startshow){// 
+                if((GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowDetail))){//  && startshow
                     DPRINTF(ShowDetail, "--------------- pc: 0x%lx --------------- %d \n", thread->pcState().pc(), simInstNum);
                     for(int i=0;i<curStaticInst->numSrcRegs();i++){
                         RegId src = curStaticInst->srcRegIdx(i);
@@ -750,7 +728,7 @@ AtomicSimpleCPU::tick()
                     }
 
                     if (ecall || (simInstNum%500 == 0) ) {
-                        DPRINTF(ShowDetail, "simIntNum %d, int regs: \n", simInstNum);
+                        DPRINTF(ShowDetail, "atomic simIntNum %d, int regs: \n", simInstNum);
                         for(int i=0;i<31;i++){
                             DPRINTF(ShowDetail, "r%d: 0x%lx\n", i, thread->readIntReg(i));
                         }
@@ -766,7 +744,7 @@ AtomicSimpleCPU::tick()
                             simInstNum++;
                     }
                     ppCommit->notify(std::make_pair(thread, curStaticInst));
-                    if((GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowDetail)) && startshow){//
+                    if((GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowDetail)) ){//&& startshow
                         for(int i=0;i<curStaticInst->numDestRegs();i++){
                             RegId dst = curStaticInst->destRegIdx(i);
                             DPRINTF(ShowDetail, "pc: 0x%lx, dst %d: 0x%lx\n", thread->pcState().pc(), dst.index(), thread->readIntReg(dst.index()));
@@ -804,7 +782,7 @@ AtomicSimpleCPU::tick()
                 postExecute();
             }
             if(t_info.numInst % 1000000 == 0){
-                printf("sim inst number: %d, test program sim inst: %d\n", t_info.numInst, simInstNum);
+                printf("atomic sim inst number: %d, test program sim inst: %d\n", t_info.numInst, simInstNum);
             }
 
             // @todo remove me after debugging with legion done
@@ -830,21 +808,6 @@ AtomicSimpleCPU::tick()
         }
         if (fault != NoFault || !t_info.stayAtPC)
             advancePC(fault);
-
-        if (fault == NoFault && curStaticInst) {
-            if(curStaticInst->numSrcRegs() == 2 && curStaticInst->numDestRegs() == 1 && curStaticInst->destRegIdx(0).index() == 0) {
-                const std::string inst_str = curStaticInst->disassemble(thread->pcState().pc());
-                RegId rtemp = curStaticInst->srcRegIdx(1);
-                if(inst_str.find("or") != std::string::npos && inst_str.find("amo") == std::string::npos){
-                    TheISA::PCState pcState = thread->pcState();
-                    // if(rtemp.index() == 1){
-                    //     printf("simInstNum: %d, ecall pc: 0x%lx\n", simInstNum, pcState.pc());
-                    // }
-                    pcState.set(tempregs[rtemp.index()]);
-                    thread->pcState(pcState);
-                }
-            }
-        }
 
         // if(fault == NoFault && simInstNum >= (ckptinsts+3) ) {
         //     TheISA::PCState pcState = thread->pcState();

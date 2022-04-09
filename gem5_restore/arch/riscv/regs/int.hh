@@ -55,7 +55,8 @@ namespace gem5
 namespace RiscvISA
 {
 
-const int NumIntArchRegs = 32;
+// const int NumIntArchRegs = 32;
+const int NumIntArchRegs = 40;
 const int NumMicroIntRegs = 1;
 const int NumIntRegs = NumIntArchRegs + NumMicroIntRegs;
 
