@@ -134,7 +134,9 @@ unameFunc64(SyscallDesc *desc, ThreadContext *tc, VPtr<Linux::utsname> name)
         for(int i=0;i<outsize-1;i++){
             sprintf(str, "%s\"0x%x\",", str, outdata[i]);
         }
-        DPRINTF1(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+	sprintf(str, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        DPRINTF1(ShowSyscall, "%s\n", str);
+        printf("%s\n", str);
         free(str);
     }
 
