@@ -17,8 +17,8 @@ void takeoverSyscall()
     uint64_t cycles = 0, insts = 0;
     cycles = __csrr_cycle();
     insts = __csrr_instret();
-    runinfo->cycles = cycles - runinfo->lastcycles;
-    runinfo->insts = insts - runinfo->lastinsts;
+    runinfo->cycles += (cycles - runinfo->lastcycles);
+    runinfo->insts += (insts - runinfo->lastinsts);
 
     uint64_t saddr = runinfo->syscall_info_addr;
     SyscallInfo *infos = (SyscallInfo *)(saddr+8+runinfo->nowcallnum * sizeof(SyscallInfo));

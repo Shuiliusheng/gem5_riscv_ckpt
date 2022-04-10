@@ -781,7 +781,7 @@ AtomicSimpleCPU::tick()
 
                 postExecute();
             }
-            if(t_info.numInst % 1000000 == 0){
+            if(t_info.numInst % 10000000 == 0){
                 printf("atomic sim inst number: %d, test program sim inst: %d\n", t_info.numInst, simInstNum);
             }
 
