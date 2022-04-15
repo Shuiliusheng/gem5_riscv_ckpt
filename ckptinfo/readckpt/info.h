@@ -22,7 +22,7 @@
 #define TakeOverAddrFalse 0x10666
 #define TakeOverAddrTrue 0x1066a
 
-#define ECall_Replace 0x00106033
+#define ECall_Replace 0x00104033
 #define Cause_ExitSysCall 1
 #define Cause_ExitInst 2
 
@@ -67,19 +67,19 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[]);
 ); 
 
 #define JmpTemp(num) asm volatile( \
-    "or x0, x0, x" num " \n\t"   \
+    "xor x0, x0, x" num " \n\t"   \
 ); 
 
 #define WriteTemp(num, val) asm volatile( \
     "mv t0, %[data] \n\t"   \
-    "sub x0, t0, x" num " \n\t"   \
+    "sll x0, t0, x" num " \n\t"   \
     "fence \n\t"   \
     :  \
     :[data]"r"(val)  \
 ); 
 
 #define Save_int_regs(BaseAddr) asm volatile( \
-    "sub x0, a0, x2 #save a0 to rtemp2 \n\t"   \
+    "sll x0, a0, x2 #save a0 to rtemp2 \n\t"   \
     "fence \n\t"   \
     "li a0, " BaseAddr " \n\t"   \
     "sd x1,8*1(a0)  \n\t"   \
@@ -113,7 +113,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[]);
     "sd x29,8*29(a0)  \n\t"   \
     "sd x30,8*30(a0)  \n\t"   \
     "sd x31,8*31(a0)  \n\t"   \
-    "add x0, a1, x2  #read rtemp2 to a1  \n\t"   \
+    "and x0, a1, x2  #read rtemp2 to a1  \n\t"   \
     "fence  \n\t"   \
     "sd a1,8*10(a0)  #read rtemp2 to a1  \n\t"   \
 );  
@@ -155,7 +155,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[]);
 
 
 #define Save_fp_regs(BaseAddr) asm volatile( \
-    "sub x0, a0, x2 #save a0 to rtemp7 \n\t"   \
+    "sll x0, a0, x2 #save a0 to rtemp7 \n\t"   \
     "fence \n\t"   \
     "li a0, " BaseAddr " \n\t"   \
     "fsd f1,8*0(a0)  \n\t"   \
@@ -190,12 +190,12 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[]);
     "fsd f29,8*29(a0)  \n\t"   \
     "fsd f30,8*30(a0)  \n\t"   \
     "fsd f31,8*31(a0)  \n\t"   \
-    "add x0, a0, x2  #read rtemp7 back to a0  \n\t"   \
+    "and x0, a0, x2  #read rtemp7 back to a0  \n\t"   \
     "fence  \n\t"   \
 );  
 
 #define Load_fp_regs(BaseAddr) asm volatile( \
-    "sub x0, a0, x2 #save a0 to rtemp7 \n\t"   \
+    "sll x0, a0, x2 #save a0 to rtemp7 \n\t"   \
     "fence \n\t"   \
     "li a0, " BaseAddr " \n\t"   \
     "fld f0,8*0(a0)  \n\t"   \
@@ -230,7 +230,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[]);
     "fld f29,8*29(a0)  \n\t"   \
     "fld f30,8*30(a0)  \n\t"   \
     "fld f31,8*31(a0)  \n\t"   \
-    "add x0, a0, x2  #read rtemp7 back to a0  \n\t"   \
+    "and x0, a0, x2  #read rtemp7 back to a0  \n\t"   \
     "fence  \n\t"   \
 ); 
 

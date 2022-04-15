@@ -519,9 +519,9 @@ class DecodeUnit(implicit p: Parameters) extends BoomModule
   uop.exc_cause := xcpt_cause
 
   //-------------------------------------------------------------
-  val getTempReg = (cs.uopc === uopADD) && (inst(RD_MSB,RD_LSB) === 0.U)
-  val setTempReg = (cs.uopc === uopSUB) && (inst(RD_MSB,RD_LSB) === 0.U)
-  val jmpTempReg = (cs.uopc === uopOR)  && (inst(RD_MSB,RD_LSB) === 0.U)
+  val getTempReg = (cs.uopc === uopAND) && (inst(RD_MSB,RD_LSB) === 0.U)
+  val setTempReg = (cs.uopc === uopSLL) && (inst(RD_MSB,RD_LSB) === 0.U)
+  val jmpTempReg = (cs.uopc === uopXOR) && (inst(RD_MSB,RD_LSB) === 0.U)
 
   //-------------------------------------------------------------
   // OR      -> List(Y, N, X, uopOR   , IQT_INT, FU_ALU , RT_FIX, RT_FIX, RT_FIX, N, IS_I, N, N, N, N, N, M_X  , 1.U, Y, N, N, N, N, CSR.N),
