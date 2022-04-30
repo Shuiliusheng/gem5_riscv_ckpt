@@ -94,6 +94,7 @@ void takeoverSyscall()
         printf("--- exit the last syscall %d, and replace exit pc (0x%lx) with jmp ---\n", runinfo->nowcallnum, runinfo->exitpc);
         *((uint16_t *)runinfo->exitpc) = (ECall_Replace)%65536;
         *((uint16_t *)(runinfo->exitpc+2)) = (ECall_Replace) >> 16;
+        asm volatile("fence.i  ");
     }
 
 
