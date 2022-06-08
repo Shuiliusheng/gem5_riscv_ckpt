@@ -309,8 +309,8 @@ def process(end, reginfo, meminfo, syscallinfo, textinfo, exitinfo):
     # for mem in memrange:
     #     mem.show()
     print("syscall number: ", len(syscallinfos))
-    for syscall in syscallinfos:
-        syscall.show()
+    # for syscall in syscallinfos:
+    #     syscall.show()
     print("first load number: ", len(loadinfo))
 
 

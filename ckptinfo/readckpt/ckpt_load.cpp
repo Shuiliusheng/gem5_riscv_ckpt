@@ -1,4 +1,5 @@
 #include "info.h"
+#include "ctrl.h"
 
 typedef struct{
     uint64_t addr;
@@ -92,8 +93,8 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     MemRangeInfo *minfos = (MemRangeInfo *)malloc(sizeof(MemRangeInfo)*mrange_num);
     fread(&minfos[0], sizeof(MemRangeInfo), mrange_num, p);
     for(int i=0;i<mrange_num;i++){
-        printf("load range: %d\r", i);
         memrange = minfos[i];
+        printf("load range: %d\r", i);
         extra.size = 0;
         extra.addr = 0;
         uint64_t msaddr = memrange.addr, meaddr = memrange.addr + memrange.size;
@@ -137,17 +138,14 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     fread(&loadnum, 8, 1, p);
     printf("--- step 4, read first load information and init these loads, load num: %d ---\n", loadnum);
     LoadInfo *linfos = (LoadInfo *)malloc(sizeof(LoadInfo)*loadnum);
-    printf("--- step 4.1, malloc over, start read data\n");
     fread(&linfos[0], sizeof(LoadInfo), loadnum, p);
     for(int j=0;j<loadnum;j++){
-	    //if(j%100==0){
-		   // printf("load %d\r", j);
-	    //}
-	    switch(linfos[j].size) {
-	        case 1: *((uint8_t *)linfos[j].addr) = (uint8_t)linfos[j].data; break;
+        // printf("load %d, addr: 0x%lx, size: %d, data: 0x%lx\n", j, linfos[j].addr, linfos[j].size, linfos[j].data);
+        switch(linfos[j].size) {
+            case 1: *((uint8_t *)linfos[j].addr) = (uint8_t)linfos[j].data; break;
             case 2: *((uint16_t *)linfos[j].addr) = (uint16_t)linfos[j].data; break;
-	        case 4: *((uint32_t *)linfos[j].addr) = (uint32_t)linfos[j].data; break;
-	        case 8: *((uint64_t *)linfos[j].addr) = linfos[j].data; break;
+            case 4: *((uint32_t *)linfos[j].addr) = (uint32_t)linfos[j].data; break;
+            case 8: *((uint64_t *)linfos[j].addr) = linfos[j].data; break;
         }
     }
     fclose(p);
@@ -169,9 +167,9 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
 
     //step6: init npc and takeover_syscall addr to temp register
     printf("--- step 6, init npc to rtemp(5) and takeover_syscall addr to rtemp(6) ---\n");
-    WriteTemp("0", npc);
-    uint64_t takeover_addr = ShowLog ? TakeOverAddrTrue : TakeOverAddrFalse;
-    WriteTemp("1", takeover_addr);
+    WriteTemp(0, npc);
+    uint64_t takeover_addr = TakeOverAddr;
+    WriteTemp(1, takeover_addr);
 
     //step7: save registers data of boot program 
     printf("--- step 789, save registers data of boot program, set testing program registers, start testing ---\n");
@@ -183,10 +181,11 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     runinfo->lastinsts = __csrr_instret();
     runinfo->startcycles = __csrr_cycle();
     runinfo->startinsts = __csrr_instret();
-
+    init_start();
     //step8: set the testing program's register information
-    Load_regs(StoreIntRegAddr);
+    Load_int_regs(StoreIntRegAddr);
 
     //step9: start the testing program
-    JmpTemp("0");
+    JmpTemp(0);
+    JmpTemp(1);
 }

@@ -94,16 +94,16 @@ void takeoverSyscall()
         printf("--- exit the last syscall %d, and replace exit pc (0x%lx) with jmp ---\n", runinfo->nowcallnum, runinfo->exitpc);
         *((uint16_t *)runinfo->exitpc) = (ECall_Replace)%65536;
         *((uint16_t *)(runinfo->exitpc+2)) = (ECall_Replace) >> 16;
-	    asm volatile("fence.i"); 
+	    asm volatile("fence.i  ");
     }
 
 
     uint64_t npc = infos->pc + 4;
-    WriteTemp("0", npc);
+    WriteTemp(0, npc);
 
     runinfo->lastcycles = __csrr_cycle();
     runinfo->lastinsts = __csrr_instret();
 
-    Load_regs(StoreIntRegAddr);
-    JmpTemp("0");
+    Load_int_regs(StoreIntRegAddr);
+    JmpTemp(0);
 }

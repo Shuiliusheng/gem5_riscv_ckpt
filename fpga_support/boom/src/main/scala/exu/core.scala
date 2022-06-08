@@ -365,6 +365,251 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
         "Using VM?             : " + usingVM.toString) + "\n")
 
   //-------------------------------------------------------------
+  //Enable_MaxInsts_Support: added some special registers
+  // process event register
+  val procTag = RegInit(0.U(32.W))
+  val exitFuncAddr = RegInit(0.U(vaddrBitsExtended.W))
+  val procMaxInsts = RegInit(0.U(64.W))
+  val procRunningInsts = RegInit(0.U(64.W))
+  val startInsts = RegInit(0.U(64.W))
+
+  val uscratch = RegInit(0.U(64.W))
+  val uretaddr = RegInit(0.U(64.W))
+  val exitNPC  = RegInit(0.U(64.W))
+  val maxPriv  = RegInit(0.U(2.W))
+
+  val tempReg1  = RegInit(0.U(64.W))
+  val tempReg2  = RegInit(0.U(64.W))
+  val tempReg3  = RegInit(0.U(64.W))
+
+  val isUserMode = csr.io.status.prv === 0.U && RegNext(csr.io.status.prv === 0.U) && RegNext(RegNext(csr.io.status.prv === 0.U))
+  val workValid = isUserMode && procTag === 0x1234567.U && (procMaxInsts =/= 0.U)
+  val overflow_insts = workValid && (procRunningInsts > procMaxInsts) && exitFuncAddr =/= 0.U && startInsts === 0.U
+  val startCounter = csr.io.status.prv <= maxPriv && procTag === 0x1234567.U
+
+  //update procRunningInsts
+  when (workValid) { //usemode
+    procRunningInsts := procRunningInsts + RegNext(PopCount(rob.io.commit.arch_valids.asUInt))
+  }
+
+  //update exitNPC, when overflow is happend and cause a exception processing
+  when (overflow_insts && RegNext(rob.io.com_xcpt.valid) && csr.io.cause === (Causes.illegal_instruction).U) {
+    exitNPC := csr.io.pc
+    printf("overflow happen, npc: 0x%x\n", csr.io.pc)
+  }
+
+  //-------------------------------------------------------------
+  //Enable_PerfCounter_Support
+  val event_counters = Module(new EventCounter(exe_units.numIrfReaders))
+
+  //reset event counters
+  event_counters.io.reset_counter := false.B
+  for (w <- 0 until coreWidth) {
+    val uop = rob.io.commit.uops(w)
+    when (rob.io.commit.valids(w) && uop.opCounter && uop.inst(30, 30) === 1.U) { //tag == 1024, reset all counters
+      event_counters.io.reset_counter := true.B
+    }
+  }
+
+  //reset counter when running > start
+  when (workValid && startInsts =/= 0.U && procRunningInsts > startInsts) {
+    startInsts := 0.U
+    procRunningInsts := 0.U
+    event_counters.io.reset_counter := true.B
+  }
+
+  //start read counter
+  for (w <- 0 until exe_units.numIrfReaders) {
+    event_counters.io.read_addr(w).valid := iss_valids(w) && iss_uops(w).opCounter && iss_uops(w).ldst =/= 0.U
+    event_counters.io.read_addr(w).bits := iss_uops(w).inst(27, 20)
+  }
+
+  
+  // fb output information
+  val dec_fbundle_vals = Wire(Vec(coreWidth, Bool()))
+  val fb_out_zero = !io.ifu.fetchpacket.valid
+  val fb_out_full = dec_fbundle_vals.reduce(_&&_)
+  val fb_out_notFull = !fb_out_full && io.ifu.fetchpacket.valid
+
+  // decode information
+  val dec_out_zero = !dec_fire.reduce(_||_)
+  val dec_out_full = dec_fire.reduce(_&&_)
+  val dec_out_notFull = !dec_out_full && !dec_out_zero
+
+  // dispatch information
+  val dis_out_zero = !dis_fire.reduce(_||_)
+  val dis_out_full = dis_fire.reduce(_&&_)
+  val dis_out_notFull = !dis_out_full && !dis_out_zero
+
+  val ldq_dis_stall = Wire(Vec(coreWidth, Bool()))
+  val stq_dis_stall = Wire(Vec(coreWidth, Bool())) 
+  val rob_dis_stall = !rob.io.ready
+
+  for(w <- 0 until coreWidth) {
+    dec_fbundle_vals(w) := io.ifu.fetchpacket.bits.uops(w).valid
+    ldq_dis_stall(w) := io.lsu.ldq_full(w) && dis_uops(w).uses_ldq
+    stq_dis_stall(w) := io.lsu.stq_full(w) && dis_uops(w).uses_stq
+  }
+
+  // issue information,
+  val iss_val_zero = !iss_valids.reduce(_||_)
+  val iss_val_full = iss_valids.reduce(_&&_)
+  val iss_val_notFull = !iss_val_full && !iss_val_zero
+  
+  //有效的issue信号，但是ld发生miss，并且由此而引发推测唤醒的失效
+  val spec_miss_issuop = Wire(Vec(exe_units.numIrfReaders, Bool()))
+  for(w <- 0 until exe_units.numIrfReaders) {
+    spec_miss_issuop(w) := iss_valids(w) && (io.lsu.ld_miss && (iss_uops(w).iw_p1_poisoned || iss_uops(w).iw_p2_poisoned))
+  }
+
+  // exe branch misprediction information
+  val exe_is_ld   = Wire(Vec(exe_units.numIrfReaders, Bool()))
+  val exe_is_st   = Wire(Vec(exe_units.numIrfReaders, Bool()))
+  val exe_is_br   = Wire(Vec(exe_units.numIrfReaders, Bool()))
+  val exe_is_jalr = Wire(Vec(exe_units.numIrfReaders, Bool()))
+  val exe_is_ret  = Wire(Vec(exe_units.numIrfReaders, Bool()))
+  val exe_is_jalrcall  = Wire(Vec(exe_units.numIrfReaders, Bool()))
+
+  var tmp_idx = 0
+  for (w <- 0 until exe_units.length) {
+    val exe_unit = exe_units(w)
+    if (exe_unit.readsIrf) {
+      val uop = exe_unit.io.req.bits.uop
+      val valid = exe_unit.io.req.valid
+      exe_is_ld(tmp_idx) := valid && uop.uses_ldq 
+      exe_is_st(tmp_idx) := valid && uop.uses_stq 
+      exe_is_br(tmp_idx) := valid && uop.is_br 
+      exe_is_jalr(tmp_idx)  := valid && uop.is_jalr 
+      exe_is_ret(tmp_idx)   := valid && uop.is_jalr && (uop.ldst === 0.U) && (uop.lrs1 === 1.U)                   
+      exe_is_jalrcall(tmp_idx) := valid && uop.is_jalr && (uop.ldst === 1.U)   
+      tmp_idx += 1
+    }
+  }
+  // execution misprediction information
+  val exe_misp_br   = b2.mispredict && b2.cfi_type === CFI_BR
+  val exe_misp_jalr = b2.mispredict && b2.cfi_type === CFI_JALR
+  val exe_misp_ret  = exe_misp_jalr && (b2.uop.ldst === 0.U) && (b2.uop.lrs1 === 1.U)
+  val exe_misp_jalrcall  = exe_misp_jalr && (b2.uop.ldst === 1.U)
+  
+
+  //commit inst type
+  val com_is_ld   = Wire(Vec(coreWidth, Bool()))
+  val com_is_st   = Wire(Vec(coreWidth, Bool()))
+  val com_is_br   = Wire(Vec(coreWidth, Bool()))
+  val com_is_jalr = Wire(Vec(coreWidth, Bool()))
+  val com_is_ret  = Wire(Vec(coreWidth, Bool()))
+  val com_is_jalrcall  = Wire(Vec(coreWidth, Bool()))
+
+  // commit misprediction information
+  val com_misp_br   = Wire(Vec(coreWidth, Bool()))
+  val com_misp_jalr = Wire(Vec(coreWidth, Bool()))
+  val com_misp_ret  = Wire(Vec(coreWidth, Bool()))
+  val com_misp_jalrcall  = Wire(Vec(coreWidth, Bool()))
+
+  for(w <- 0 until coreWidth) {
+    val uop = rob.io.commit.uops(w)
+    val valid = rob.io.commit.arch_valids(w)
+    com_is_ld(w) := valid && uop.uses_ldq 
+    com_is_st(w) := valid && uop.uses_stq 
+    com_is_br(w) := valid && uop.is_br 
+    com_is_jalr(w)  := valid && uop.is_jalr 
+    com_is_ret(w)   := valid && uop.is_jalr && (uop.ldst === 0.U) && (uop.lrs1 === 1.U)                   
+    com_is_jalrcall(w) := valid && uop.is_jalr && (uop.ldst === 1.U)  
+
+    com_misp_br(w)    := com_is_br(w)   && uop.debug_fsrc === BSRC_C
+    com_misp_jalr(w)  := com_is_jalr(w) && uop.debug_fsrc === BSRC_C 
+    com_misp_ret(w)   := com_is_ret(w)  && uop.debug_fsrc === BSRC_C 
+    com_misp_jalrcall(w) := com_is_jalrcall(w) && uop.debug_fsrc === BSRC_C 
+  }
+
+  //exception information
+  val misalign_excpt = csr.io.exception && (csr.io.cause === Causes.misaligned_load.U || csr.io.cause === Causes.misaligned_store.U)
+  val lstd_pagefault = csr.io.exception && (csr.io.cause === Causes.load_page_fault.U || csr.io.cause === Causes.store_page_fault.U)
+  val fetch_pagefault = csr.io.exception && (csr.io.cause === Causes.fetch_page_fault.U)
+  val mini_exception = RegNext(rob.io.flush.valid && !rob.io.com_xcpt.valid && rob.io.com_xcpt.bits.cause === MINI_EXCEPTION_MEM_ORDERING)
+
+
+  //connect signal to counters
+  for (w <- 0 until subECounterNum*16) {
+    event_counters.io.event_signals(w) := 0.U
+  }
+
+  when (startCounter) {
+    event_counters.io.event_signals(0) :=   1.U  //cycles
+    event_counters.io.event_signals(1) :=  RegNext(PopCount(rob.io.commit.arch_valids.asUInt)) // commit inst
+    event_counters.io.event_signals(2) :=  Mux(io.ifu.icache_valid_access, 1.U, 0.U) //i-cache valid access number
+    event_counters.io.event_signals(3) :=  Mux(io.ifu.icache_hit, 1.U, 0.U)  //icache hit number
+    event_counters.io.event_signals(4) :=  Mux(io.ifu.perf.acquire, 1.U, 0.U) //i-cache send req to next level cache
+    event_counters.io.event_signals(5) :=  Mux(io.ifu.itlb_valid_access, 1.U, 0.U) //itlb valid access number
+    event_counters.io.event_signals(6) :=  Mux(io.ifu.itlb_hit, 1.U, 0.U) //itlb hit number
+    event_counters.io.event_signals(7) :=  Mux(io.ifu.perf.tlbMiss, 1.U, 0.U) //i-tlb start ptw
+    event_counters.io.event_signals(8) :=  Mux(io.ifu.bpsrc_f1, 1.U, 0.U) // npc use f1
+    event_counters.io.event_signals(9) :=  Mux(io.ifu.bpsrc_f2, 1.U, 0.U) // npc use f2
+    event_counters.io.event_signals(10) :=  Mux(io.ifu.bpsrc_f3, 1.U, 0.U) // npc use f3
+    event_counters.io.event_signals(11) :=  Mux(io.ifu.bpsrc_core, 1.U, 0.U) // npc use core information
+
+    event_counters.io.event_signals(12) :=  Mux(fb_out_zero, 1.U, 0.U)  //fetch buffer output no valid inst
+    event_counters.io.event_signals(13) :=  Mux(fb_out_full, 1.U, 0.U)  //fb output has corewidth valid inst
+    event_counters.io.event_signals(14) :=  Mux(fb_out_notFull, 1.U, 0.U) //fbout has valid inst but not full
+
+    event_counters.io.event_signals(15) :=  Mux(dec_out_zero, 1.U, 0.U)  //decode output no valid inst
+    event_counters.io.event_signals(16) :=  Mux(dec_out_full, 1.U, 0.U)  //decode output has corewidth valid inst
+    event_counters.io.event_signals(17) :=  Mux(dec_out_notFull, 1.U, 0.U) //decode out has valid inst but not full
+    event_counters.io.event_signals(18) :=  Mux(dec_brmask_logic.io.is_full.reduce(_||_), 1.U, 0.U) //brmask full cycles
+    event_counters.io.event_signals(19) :=  PopCount(ren_stalls.asUInt)  //rename stall number
+
+    event_counters.io.event_signals(20) :=  Mux(dis_out_zero, 1.U, 0.U)  //dispatch output no valid inst
+    event_counters.io.event_signals(21) :=  Mux(dis_out_full, 1.U, 0.U)  //dispatch output has corewidth valid inst
+    event_counters.io.event_signals(22) :=  Mux(dis_out_notFull, 1.U, 0.U) //dispatch out has valid inst but not full
+    event_counters.io.event_signals(23) :=  PopCount(ldq_dis_stall.asUInt)  //ldq dispatch stall times
+    event_counters.io.event_signals(24) :=  PopCount(stq_dis_stall.asUInt)  //stq dispatch stall times
+    event_counters.io.event_signals(25) :=  Mux(rob_dis_stall, 1.U, 0.U)  //rob stall dispatch cycles
+
+    event_counters.io.event_signals(26) :=  PopCount(iss_valids.asUInt)  //issue int uop number
+    event_counters.io.event_signals(27) :=  Mux(iss_val_zero, 1.U, 0.U)  //issue output no valid inst
+    event_counters.io.event_signals(28) :=  Mux(iss_val_full, 1.U, 0.U)  //issue output has corewidth valid inst
+    event_counters.io.event_signals(29) :=  Mux(iss_val_notFull, 1.U, 0.U) //issue out has valid inst but not full
+    event_counters.io.event_signals(30) :=  PopCount(spec_miss_issuop.asUInt)  //valid mis-wakeup issue uop number
+
+    event_counters.io.event_signals(31) :=  PopCount(exe_is_ld.asUInt)       //execute ld number
+    event_counters.io.event_signals(32) :=  PopCount(exe_is_st.asUInt)       //execute st number
+    event_counters.io.event_signals(33) :=  io.lsu.dtlb_valid_access            //valid dtlb req number
+    event_counters.io.event_signals(34) :=  io.lsu.dtlb_miss_num              //dtlb miss number
+    event_counters.io.event_signals(35) :=  Mux(io.lsu.perf.tlbMiss, 1.U, 0.U)  //d-tlb miss
+    event_counters.io.event_signals(36) :=  io.lsu.dcache_valid_access   //valid dcache access number
+    event_counters.io.event_signals(37) :=  io.lsu.dcache_nack_num   //d-cache load & store nack number
+    event_counters.io.event_signals(38) :=  Mux(io.lsu.perf.acquire, 1.U, 0.U) //dcache send req to next level number
+
+    event_counters.io.event_signals(39) :=  PopCount(exe_is_br.asUInt)       //execute br number
+    event_counters.io.event_signals(40) :=  PopCount(exe_is_jalr.asUInt)   //execute jalr number
+    event_counters.io.event_signals(41) :=  PopCount(exe_is_ret.asUInt)     //execute jalr-ret number
+    event_counters.io.event_signals(42) :=  PopCount(exe_is_jalrcall.asUInt)  //execute jalr-call number
+    event_counters.io.event_signals(43) :=  Mux(exe_misp_br, 1.U, 0.U)       //exe misp br number
+    event_counters.io.event_signals(44) :=  Mux(exe_misp_jalr, 1.U, 0.U)   //exe misp jalr number
+    event_counters.io.event_signals(45) :=  Mux(exe_misp_ret, 1.U, 0.U)     //exe misp jalr-ret number
+    event_counters.io.event_signals(46) :=  Mux(exe_misp_jalrcall, 1.U, 0.U)  //exe misp jalr-call number
+
+    event_counters.io.event_signals(47) :=  PopCount(com_is_ld.asUInt)       //commit ld number
+    event_counters.io.event_signals(48) :=  PopCount(com_is_st.asUInt)       //commit st number
+    event_counters.io.event_signals(49) :=  PopCount(com_is_br.asUInt)       //commit br number
+    event_counters.io.event_signals(50) :=  PopCount(com_is_jalr.asUInt)   //commit jalr number
+    event_counters.io.event_signals(51) :=  PopCount(com_is_ret.asUInt)     //commit jalr-ret number
+    event_counters.io.event_signals(52) :=  PopCount(com_is_jalrcall.asUInt)  //commit jalr-call number
+    event_counters.io.event_signals(53) :=  PopCount(com_misp_br.asUInt)       //com misp br number
+    event_counters.io.event_signals(54) :=  PopCount(com_misp_jalr.asUInt)   //com misp jalr number
+    event_counters.io.event_signals(55) :=  PopCount(com_misp_ret.asUInt)     //com misp jalr-ret number
+    event_counters.io.event_signals(56) :=  PopCount(com_misp_jalrcall.asUInt)  //com misp jalr-call number
+
+    event_counters.io.event_signals(57) :=  Mux(io.ptw.perf.l2miss, 1.U, 0.U) //L2 TLB miss
+    event_counters.io.event_signals(58) :=  Mux(misalign_excpt, 1.U, 0.U)  //misalign_excpt
+    event_counters.io.event_signals(59) :=  Mux(lstd_pagefault, 1.U, 0.U)  //lstd_pagefault
+    event_counters.io.event_signals(60) :=  Mux(fetch_pagefault, 1.U, 0.U)  //fetch_pagefault
+    event_counters.io.event_signals(61) :=  Mux(mini_exception, 1.U, 0.U)  //mini_exception
+    event_counters.io.event_signals(62) :=  Mux(rob.io.commit.rollback, 1.U, 0.U)  //rollback_cycles
+  }
+  
+
+  //-------------------------------------------------------------
   //-------------------------------------------------------------
   // **** Fetch Stage/Frontend ****
   //-------------------------------------------------------------
@@ -402,17 +647,29 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     new_ghist.ras_idx := io.ifu.get_pc(0).entry.ras_idx
     io.ifu.redirect_ghist := new_ghist
     when (FlushTypes.useCsrEvec(flush_typ)) {
-      io.ifu.redirect_pc  := Mux(flush_typ === FlushTypes.eret,
-                                 RegNext(RegNext(csr.io.evec)),
-                                 csr.io.evec)
+      //Enable_MaxInsts_Support: when overflow maxinst && exception cause is illegal inst, then redirect to exitFuncAddr
+      when (isUserMode && overflow_insts && RegNext(rob.io.com_xcpt.bits.cause === (Causes.illegal_instruction).U)) {
+        io.ifu.redirect_pc  := exitFuncAddr
+        procTag := 0.U
+        procMaxInsts := 0.U
+      }
+      .otherwise {
+        io.ifu.redirect_pc  := Mux(flush_typ === FlushTypes.eret, RegNext(RegNext(csr.io.evec)), csr.io.evec)
+      }
+
     } .otherwise {
       val flush_pc = (AlignPCToBoundary(io.ifu.get_pc(0).pc, icBlockBytes)
                       + RegNext(rob.io.flush.bits.pc_lob)
                       - Mux(RegNext(rob.io.flush.bits.edge_inst), 2.U, 0.U))
       val flush_pc_next = flush_pc + Mux(RegNext(rob.io.flush.bits.is_rvc), 2.U, 4.U)
-      io.ifu.redirect_pc := Mux(FlushTypes.useSamePC(flush_typ),
-                                flush_pc, flush_pc_next)
-
+      //Enable_MaxInsts_Support: URet happend, this time redirect to the addr of uretaddr
+      when(RegNext(rob.io.flush.bits.isURet) && uretaddr =/= 0.U) {
+        io.ifu.redirect_pc := uretaddr
+        printf("uret redirect, target pc: 0x%x\n", io.ifu.redirect_pc)
+      }
+      .otherwise{
+        io.ifu.redirect_pc := Mux(FlushTypes.useSamePC(flush_typ), flush_pc, flush_pc_next)
+      }
     }
     io.ifu.redirect_ftq_idx := RegNext(rob.io.flush.bits.ftq_idx)
   } .elsewhen (brupdate.b2.mispredict && !RegNext(rob.io.flush.valid)) {
@@ -508,7 +765,13 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     decode_units(w).io.interrupt_cause := csr.io.interrupt_cause
 
     dec_uops(w) := decode_units(w).io.deq.uop
-  }
+
+    //Enable_MaxInsts_Support: when overflow maxinsts will make all decoded uop become illegal inst
+    when (overflow_insts) {
+      dec_uops(w).exception := true.B
+      dec_uops(w).exc_cause := (Causes.illegal_instruction).U
+    }
+  }  
 
   //-------------------------------------------------------------
   // FTQ GetPC Port Arbitration
@@ -1002,7 +1265,10 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
   // Extra I/O
   // Delay retire/exception 1 cycle
   csr.io.retire    := RegNext(PopCount(rob.io.commit.arch_valids.asUInt))
-  csr.io.exception := RegNext(rob.io.com_xcpt.valid)
+  //Enable_MaxInsts_Support: overflow maxinst will not cause exception to kernel
+  //
+  val isOverFlowExcpt = (rob.io.com_xcpt.bits.cause === Causes.illegal_instruction.U) && overflow_insts
+  csr.io.exception := RegNext(rob.io.com_xcpt.valid && !(isOverFlowExcpt))
   // csr.io.pc used for setting EPC during exception or CSR.io.trace.
 
   csr.io.pc        := (boom.util.AlignPCToBoundary(io.ifu.get_pc(0).com_pc, icBlockBytes)
@@ -1073,12 +1339,41 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
     if (exe_unit.readsIrf) {
       exe_unit.io.req <> iregister_read.io.exe_reqs(iss_idx)
 
+      //Enable_PerfCounter_Support: get counter value and send to execution.req.rs1_data
+      val uop = exe_unit.io.req.bits.uop
+      when (uop.opCounter && uop.ldst =/= 0.U) {
+        exe_unit.io.req.bits.rs1_data := event_counters.io.read_data(iss_idx)
+      }
+
       if (exe_unit.bypassable) {
         for (i <- 0 until exe_unit.numBypassStages) {
           bypasses(bypass_idx) := exe_unit.io.bypass(i)
           bypass_idx += 1
         }
       }
+
+      //Enable_MaxInsts_Support: read special registers data from regfile
+      val rrd_uop = iregister_read.io.exe_reqs(iss_idx).bits.uop
+      when (rrd_uop.setEvent && rrd_uop.ldst === 0.U ) {
+        val tag = rrd_uop.inst(31, 20)
+        val rs1_data = iregister_read.io.exe_reqs(iss_idx).bits.rs1_data
+        switch (tag){
+          is (SetEvent_ProcTag)       { procTag := rs1_data(31, 0) }
+          is (SetEvent_ExitFuncAddr)  { exitFuncAddr := rs1_data }
+          is (SetEvent_UScratch)      { uscratch := rs1_data }
+          is (SetEvent_URetAddr)      { uretaddr := rs1_data }
+          is (SetEvent_MaxPriv)       { maxPriv  := rs1_data(1,0) }
+          is (SetEvent_Temp1)         { tempReg1 := rs1_data }
+          is (SetEvent_Temp2)         { tempReg2 := rs1_data }
+          is (SetEvent_Temp3)         { tempReg3 := rs1_data }
+          is (SetEvent_StartInsts)    { startInsts := rs1_data }
+          is (SetEvent_ProcMaxInsts)  { 
+            procMaxInsts := rs1_data 
+            procRunningInsts := 0.U 
+          }
+        }
+      }
+
       iss_idx += 1
     }
   }
@@ -1152,6 +1447,23 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
         iregfile.io.write_ports(w_cnt).bits.data := Mux(wbReadsCSR, csr.io.rw.rdata, wbdata)
       } else {
         iregfile.io.write_ports(w_cnt).bits.data := wbdata
+      }
+
+      when (wbresp.bits.uop.opCounter && wbresp.bits.uop.ldst =/= 0.U) {
+        printf("writeBackCounter, pc: 0x%x, tag: %d, ldst: %d, data: 0x%x\n", wbresp.bits.uop.debug_pc, wbresp.bits.uop.inst(31, 20), wbresp.bits.uop.ldst, wbdata)
+      }
+
+      //Enable_MaxInsts_Support: write special registers data to regfile
+      when (wbresp.bits.uop.setEvent && wbresp.bits.uop.ldst =/= 0.U ) {
+        val tag = wbresp.bits.uop.inst(31, 20)
+        switch (tag) {
+          is (ReadEvent_ProcTag)   { iregfile.io.write_ports(w_cnt).bits.data := Cat(0.U(32.W), procTag) }
+          is (ReadEvent_UScratch)  { iregfile.io.write_ports(w_cnt).bits.data := uscratch }
+          is (ReadEvent_ExitNPC)   { iregfile.io.write_ports(w_cnt).bits.data := exitNPC }
+          is (ReadEvent_Temp1)     { iregfile.io.write_ports(w_cnt).bits.data := tempReg1 }
+          is (ReadEvent_Temp2)     { iregfile.io.write_ports(w_cnt).bits.data := tempReg2 }
+          is (ReadEvent_Temp3)     { iregfile.io.write_ports(w_cnt).bits.data := tempReg3 }
+        }
       }
 
       assert (!wbIsValid(RT_FLT), "[fppipeline] An FP writeback is being attempted to the Int Regfile.")
@@ -1324,7 +1636,13 @@ class BoomCore(usingTrace: Boolean)(implicit p: Parameters) extends BoomModule
   //-------------------------------------------------------------
   //-------------------------------------------------------------
 
-
+  for (w <- 0 until coreWidth) {
+    val priv = RegNext(csr.io.status.prv)
+    when (rob.io.commit.arch_valids(w)) {
+      val uop = rob.io.commit.uops(w)
+      printf("commit info, priv: %d, pc: 0x%x, inst: 0x%x, runningInst: %d, procMaxInsts: %d, isUserMode: %d, workValid: %d, overflw: %d\n", priv, uop.debug_pc, uop.inst, procRunningInsts, procMaxInsts, isUserMode, workValid, overflow_insts)
+    }
+  }
   if (COMMIT_LOG_PRINTF) {
     var new_commit_cnt = 0.U
 
