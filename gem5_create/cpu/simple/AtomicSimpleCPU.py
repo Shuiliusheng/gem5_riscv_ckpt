@@ -58,7 +58,7 @@ class AtomicSimpleCPU(BaseSimpleCPU):
         return True
 
     width = Param.Int(1, "CPU width")
-    ckptinsts = Param.Int(3000, "checkpoint insts number")
+    ckptinsts = Param.Int(50000000, "checkpoint insts number")
     simulate_data_stalls = Param.Bool(False, "Simulate dcache stall cycles")
     simulate_inst_stalls = Param.Bool(False, "Simulate icache stall cycles")
 

@@ -102,7 +102,7 @@ AtomicSimpleCPU::AtomicSimpleCPU(const AtomicSimpleCPUParams &p)
         ::gem5::debug::ShowSyscall.enable();
     }
 
-    printf("start ckpt: %d, end ckpt: %d\n", p.ckpt_startinsts, p.ckpt_endinsts);
+    printf("start ckpt: %d, end ckpt: %d, interval: %d\n", p.ckpt_startinsts, p.ckpt_endinsts, p.ckptinsts);
 
 }
 
