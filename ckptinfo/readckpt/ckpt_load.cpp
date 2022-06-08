@@ -30,8 +30,6 @@ void read_ckptsyscall(char filename[])
 
     allocsize = filesize + (4096-filesize%4096);
     alloc_vaddr = (uint64_t)mmap((void *)0x2000000, allocsize, PROT_READ | PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, 0);    
-
-    printf("ckptsyscall file alloc_vaddr: 0x%lx\n", alloc_vaddr);
     
     if (fread((void *)alloc_vaddr, filesize, 1, fp) != 1) {
         printf("cannot read file: %s\n", filename);
@@ -44,9 +42,7 @@ void read_ckptsyscall(char filename[])
     runinfo->nowcallnum = 0;
     runinfo->totalcallnum = *((uint64_t *)alloc_vaddr);
 
-    printf("--- step 5, read syscall information and map them to memory, totalcallnum: %d ---\n", runinfo->totalcallnum);
-    if(ShowLog)
-        printf("syscallnum: %ld, alloc_mem: (0x%lx 0x%lx)\n", runinfo->totalcallnum, alloc_vaddr,  alloc_vaddr + allocsize);
+    printf("--- step 5, read syscall infor and map to memory, totalcallnum: %d ---\n", runinfo->totalcallnum);
 }
 
 
@@ -73,7 +69,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     fseek(p, 16*temp+8, SEEK_SET);
 
     fread(&siminfo, sizeof(siminfo), 1, p);
-    printf("siminfo, start: %d, simNum: %d, exitpc: 0x%lx, cause: %d\n", siminfo.start, siminfo.simNum, siminfo.exitpc, siminfo.exit_cause);
+    printf("sim slice info, start: %d, simNum: %d, exitpc: 0x%lx, cause: %d\n", siminfo.start, siminfo.simNum, siminfo.exitpc, siminfo.exit_cause);
     runinfo->exitpc = siminfo.exitpc;
     runinfo->exit_cause = siminfo.exit_cause;
 
@@ -128,7 +124,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
 
         if(extra.size !=0){
             int* arr1 = static_cast<int*>(mmap((void *)extra.addr, extra.size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, 0, 0));
-            if(ShowLog)
+            if(extra.addr != (uint64_t)arr1)
                 printf("map range: (0x%lx, 0x%lx), mapped addr: 0x%lx\n", extra.addr, extra.addr + extra.size, arr1);
             assert(extra.addr == (uint64_t)arr1); 
         }
@@ -136,7 +132,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
 
     //step 4: read first load information, and store these data to memory
     fread(&loadnum, 8, 1, p);
-    printf("--- step 4, read first load information and init these loads, load num: %d ---\n", loadnum);
+    printf("--- step 4, read first load infor and init them, first load num: %d ---\n", loadnum);
     LoadInfo *linfos = (LoadInfo *)malloc(sizeof(LoadInfo)*loadnum);
     fread(&linfos[0], sizeof(LoadInfo), loadnum, p);
     for(int j=0;j<loadnum;j++){
@@ -168,8 +164,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     //step6: init npc and takeover_syscall addr to temp register
     printf("--- step 6, init npc to rtemp(5) and takeover_syscall addr to rtemp(6) ---\n");
     WriteTemp(0, npc);
-    uint64_t takeover_addr = TakeOverAddr;
-    WriteTemp(1, takeover_addr);
+    WriteTemp(1, takeOverAddr);
 
     //step7: save registers data of boot program 
     printf("--- step 789, save registers data of boot program, set testing program registers, start testing ---\n");
@@ -186,6 +181,6 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     Load_int_regs(StoreIntRegAddr);
 
     //step9: start the testing program
-    JmpTemp(0);
-    JmpTemp(1);
+    JmpTemp(0); //WriteTemp(0, npc);
+    JmpTemp(1); //useless
 }

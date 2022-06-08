@@ -48,8 +48,6 @@ typedef struct {
 
 MemRangeInfo data_seg, text_seg;
 
-
-
 static inline int get_prot(uint32_t p_flags)
 {
   int prot_x = (p_flags & PF_X) ? PROT_EXEC  : PROT_NONE;
@@ -61,7 +59,7 @@ static inline int get_prot(uint32_t p_flags)
 //replace ecall with jmptemp 6
 void replaceEcall(uint16_t *text, uint64_t length)
 {
-    uint16_t data1 = 0x0000, data0 = 0x0073;
+    uint16_t data1 = 0x0000, data0 = 0x0073;    //ecall
     //JmpTemp("1");//00106033
     uint16_t pdata1 = (ECall_Replace) >> 16, pdata0 = (ECall_Replace)%65536;
     for(int i=0;i<length;i++) {
@@ -125,10 +123,6 @@ uint64_t loadelf(char * progname, char *ckptinfo)
             if(prot & PROT_EXEC) {
                 text_seg.addr = vaddr;
                 text_seg.size = pmemsz;
-                if(ShowLog){
-                    printf("text segment info, addr: 0x%lx, size: 0x%lx, endaddr: 0x%lx\n", phdr.p_vaddr, phdr.p_memsz, phdr.p_vaddr + phdr.p_memsz);
-                    printf("padded text segment info, addr: 0x%lx, size: 0x%lx, endaddr: 0x%lx\n", text_seg.addr, text_seg.size, vaddr + pmemsz);
-                }
             }	
 
             uint64_t alloc_vaddr = (uint64_t)mmap((void*)vaddr, pmemsz, prot | PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANON, -1, 0);
@@ -164,9 +158,6 @@ uint64_t loadelf(char * progname, char *ckptinfo)
                     
                     if(shdr.sh_size!=0 && shdr.sh_flags & 0x4){//SHF_EXECINSTR = 0x4
                         fseek(fp, shdr.sh_offset, SEEK_SET);
-                        if(ShowLog){
-                            printf("load executable segment, addr: 0x%lx, size: 0x%lx, end: 0x%lx\n", shdr.sh_addr, shdr.sh_size, shdr.sh_size+shdr.sh_addr);
-                        }
                         //选择只load可以被执行的代码段，其余不加载，以减少恢复时间
                         if (fread((void *)shdr.sh_addr, shdr.sh_size, 1, fp) != 1) {    //加载执行的段
                             printf("cannot read shdr from file\n");
@@ -175,12 +166,6 @@ uint64_t loadelf(char * progname, char *ckptinfo)
                         replaceEcall((uint16_t *)shdr.sh_addr, shdr.sh_size/2);
                     }
                 }
-                // if (!(prot & PROT_WRITE)){
-                //     if (mprotect((void *)phdr.p_vaddr, phdr.p_memsz, prot) == -1) {
-                //         printf("mprotect error: %d\n", i);
-                //         exit(1);
-                //     }
-                // }
             }
         }
 	}

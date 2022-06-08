@@ -9,11 +9,6 @@
 #include <stdint.h>
 #include <unistd.h>
 
-#ifdef SHOWLOG
-    #define ShowLog true
-#else
-    #define ShowLog false
-#endif
 
 #define RunningInfoAddr 0x150000
 #define StoreIntRegAddr "0x150028"
@@ -26,6 +21,9 @@
 #define ECall_Replace 0x00d06013
 #define Cause_ExitSysCall 1
 #define Cause_ExitInst 2
+
+
+extern uint64_t takeOverAddr;
 
 typedef struct{
     uint64_t exitpc;
@@ -50,7 +48,6 @@ typedef struct{
 }MemRangeInfo;
 
 
-
 extern MemRangeInfo data_seg, text_seg;
 
 void takeoverSyscall();
@@ -62,7 +59,6 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[]);
 #define WriteRTemp(srcreg, rtempnum) "ori x0, " srcreg ", 8+" #rtempnum " \n\t"
 #define ReadRTemp(dstreg, rtempnum) "ori x0, " dstreg ", 4+" #rtempnum " \n\t"
 #define JmpRTemp(rtempnum) "ori x0, x0, 12+" #rtempnum " \n\t"
-
 
 #define Load_necessary(BaseAddr) asm volatile( \
     "li a0, " BaseAddr " \n\t"   \
@@ -80,8 +76,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[]);
     "mv t0, %[data] \n\t"   \
     WriteRTemp("t0", num) \
     "fence \n\t"   \
-    :  \
-    :[data]"r"(val)  \
+    : :[data]"r"(val)  \
 ); 
 
 #define Save_int_regs(BaseAddr) asm volatile( \

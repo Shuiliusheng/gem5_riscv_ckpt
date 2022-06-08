@@ -5,7 +5,7 @@ int main(int argc, char **argv)
 {
     if(argc < 3){
         printf("parameters are not enough!\n");
-        printf("./read ckptinfo.log ckpt_syscallinfo.log \n");
+        printf("./readckpt.riscv ckptinfo.log ckpt_syscallinfo.log exe\n");
         return 0;
     }
 

@@ -8,8 +8,13 @@ typedef struct{
     uint64_t bufaddr, data_offset, data_size;
 }SyscallInfo;
 
+extern unsigned long long __takeOverSys_Addr;
+
+uint64_t takeOverAddr = (uint64_t)&__takeOverSys_Addr;
+
 void takeoverSyscall()
 {
+    asm volatile("__takeOverSys_Addr: ");
     Save_int_regs(StoreIntRegAddr);
     Load_necessary(OldIntRegAddr);
     RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
@@ -35,9 +40,6 @@ void takeoverSyscall()
         exit(0);
     }
 
-    if(ShowLog) 
-        printf("syscall num: 0x%lx\n", infos->num);
-
     //this syscall has data to process
     if (infos->data_offset != 0xffffffff){
         if (infos->num == 0x3f) {    //read
@@ -46,23 +48,8 @@ void takeoverSyscall()
             for(int c=0;c<infos->data_size;c++){
                 dst[c] = data[c];
             }
-
-            if(ShowLog){
-                printf("read, p0-p2: 0x%lx, 0x%lx, 0x%lx; record p0-p2: 0x%lx, 0x%lx, 0x%lx\n", runinfo->intregs[10], runinfo->intregs[11], runinfo->intregs[12], infos->p0, infos->p1, infos->p2);
-            }
         }
         else if(infos->num == 0x40) { //write
-            if(ShowLog){
-                printf("write, p0-p2: 0x%lx, 0x%lx, 0x%lx; record p0-p2: 0x%lx, 0x%lx, 0x%lx\n", runinfo->intregs[10], runinfo->intregs[11], runinfo->intregs[12], infos->p0, infos->p1, infos->p2);
-                if(runinfo->intregs[10] == 1){
-                    printf("record data: ");
-                    char *data = (char *)(saddr + infos->data_offset);
-                    char t = data[runinfo->intregs[12]-1];
-                    data[runinfo->intregs[12]-1]='\0';
-                    printf("%s", (char *)data);
-                    data[runinfo->intregs[12]-1] = t;
-                }
-            }
             char *dst = (char *)runinfo->intregs[11];
             if(runinfo->intregs[10] == 1){
                 char t = dst[runinfo->intregs[12]-1];
@@ -77,9 +64,6 @@ void takeoverSyscall()
             unsigned char *data = (unsigned char *)(saddr + infos->data_offset);
             for(int c=0;c<infos->data_size;c++){
                 dst[c] = data[c];
-            }
-            if(ShowLog){
-                printf("p0-p2: 0x%lx, 0x%lx, 0x%lx; record p0-p2: 0x%lx, 0x%lx, 0x%lx, 0x%lx(bufaddr), %dB(datasize)\n", runinfo->intregs[10], runinfo->intregs[11], runinfo->intregs[12], infos->p0, infos->p1, infos->p2, infos->bufaddr, infos->data_size);
             }
         }
     }
