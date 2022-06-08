@@ -3,7 +3,7 @@
 cc=gcc
 flags="-static -O2"
 dflags=""
-target="readinfo"
+target="showinfo"
 
 filelist="ckpt_load.cpp elf_load.cpp readckpt.cpp"
 echo ${cc} $filelist $flags $dflags -o ${target}

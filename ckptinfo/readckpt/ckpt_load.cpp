@@ -137,11 +137,12 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     fread(&loadnum, 8, 1, p);
     printf("--- step 4, read first load information and init these loads, load num: %d ---\n", loadnum);
     LoadInfo *linfos = (LoadInfo *)malloc(sizeof(LoadInfo)*loadnum);
+    printf("--- step 4.1, malloc over, start read data\n");
     fread(&linfos[0], sizeof(LoadInfo), loadnum, p);
     for(int j=0;j<loadnum;j++){
-	    if(j%100==0){
-		    printf("load %d\r", j);
-	    }
+	    //if(j%100==0){
+		   // printf("load %d\r", j);
+	    //}
 	    switch(linfos[j].size) {
 	        case 1: *((uint8_t *)linfos[j].addr) = (uint8_t)linfos[j].data; break;
             case 2: *((uint16_t *)linfos[j].addr) = (uint16_t)linfos[j].data; break;

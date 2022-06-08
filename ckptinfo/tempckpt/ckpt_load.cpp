@@ -44,8 +44,16 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
         exit(1);
     }
 
-    fread(&temp, 8, 1, p);
-    fseek(p, 16*temp+8, SEEK_SET);
+    MemRangeInfo textinfo;
+    uint64_t numinfos = 0, textsize = 0;
+    fread(&numinfos, 8, 1, p);
+    for(int i=0;i<numinfos;i++){
+        fread(&textinfo, sizeof(MemRangeInfo), 1, p);
+        textsize += textinfo.size;
+    }
+    printf("textinfo: %d, size: %d\n", numinfos, textsize);
+
+    fseek(p, 16*numinfos+8, SEEK_SET);
 
     fread(&siminfo, sizeof(siminfo), 1, p);
     printf("siminfo, start: %d, simNum: %d, exitpc: 0x%lx, cause: %d\n", siminfo.start, siminfo.simNum, siminfo.exitpc, siminfo.exit_cause);
@@ -65,6 +73,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     printf("--- step 3, read memory range information and do map, range num: %d ---\n", mrange_num);
     MemRangeInfo *minfos = (MemRangeInfo *)malloc(sizeof(MemRangeInfo)*mrange_num);
     fread(&minfos[0], sizeof(MemRangeInfo), mrange_num, p);
+    unsigned int totalsize = 0;
     for(int i=0;i<mrange_num;i++){
         //fread(&memrange, sizeof(memrange), 1, p);
         memrange = minfos[i];
@@ -72,6 +81,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
         extra.addr = 0;
         uint64_t msaddr = memrange.addr, meaddr = memrange.addr + memrange.size;
         uint64_t tsaddr = text_seg.addr, teaddr = text_seg.addr + text_seg.size;
+        totalsize += memrange.size;
         //delete the range that covered by text segment
         if(msaddr < tsaddr && meaddr > tsaddr) {
             memrange.size = tsaddr - msaddr;
@@ -90,15 +100,17 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
             }
         }
 
-        if(memrange.size !=0){
-            printf("map range %d: (0x%lx, 0x%lx)\n", i, memrange.addr, memrange.addr + memrange.size);
-        }
+        // if(memrange.size !=0){
+        //     printf("map range %d: (0x%lx, 0x%lx)\n", i, memrange.addr, memrange.addr + memrange.size);
+        // }
 
-        if(extra.size !=0){
-            printf("map range %d: (0x%lx, 0x%lx)\n", i, extra.addr, extra.addr + extra.size);
-        }
+        // if(extra.size !=0){
+        //     printf("map range %d: (0x%lx, 0x%lx)\n", i, extra.addr, extra.addr + extra.size);
+        // }
     }
     free(minfos);
+
+    printf("total map memrange size: %d, num: %d\n", totalsize, mrange_num);
 
     //step 4: read first load information, and store these data to memory
     fread(&loadnum, 8, 1, p);
