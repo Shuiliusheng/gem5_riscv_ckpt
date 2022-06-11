@@ -66,8 +66,19 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     //step 2: read integer and float registers
     fread(&intregs[0], 8, 32, p);
     fread(&fpregs[0], 8, 32, p);
-    printf("--- step 2, read integer and float registers ---\n");
 
+    printf("--- integer registers ---\n");
+    for(int i=0;i<32;i++){
+        printf("int reg %d: 0x%lx\n", i, intregs[i]);
+    }
+
+    printf("--- float registers ---\n");
+    for(int i=0;i<32;i++){
+        printf("float reg %d: 0x%lx\n", i, fpregs[i]);
+    }
+
+
+    printf("--- step 2, read integer and float registers ---\n");
     //step 3: read memory range information and map these ranges
     fread(&mrange_num, 8, 1, p);
     printf("--- step 3, read memory range information and do map, range num: %d ---\n", mrange_num);
@@ -99,14 +110,6 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
                 memrange.size = meaddr - teaddr;
             }
         }
-
-        // if(memrange.size !=0){
-        //     printf("map range %d: (0x%lx, 0x%lx)\n", i, memrange.addr, memrange.addr + memrange.size);
-        // }
-
-        // if(extra.size !=0){
-        //     printf("map range %d: (0x%lx, 0x%lx)\n", i, extra.addr, extra.addr + extra.size);
-        // }
     }
     free(minfos);
 
@@ -125,6 +128,6 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     }
     fclose(p);
     
-    //step5: 加载syscall的执行信息到内存中
-    read_ckptsyscall(ckpt_sysinfo);
+    // step5: 加载syscall的执行信息到内存中
+    // read_ckptsyscall(ckpt_sysinfo);
 }

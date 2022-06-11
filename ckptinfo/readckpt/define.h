@@ -1,7 +1,6 @@
 #ifndef   _DEFINE_H_  
 #define   _DEFINE_H_
 
-
 //-------------------------------------------------------------------
 #define SetProcTag(srcreg)          "addi x0, " srcreg ", 1 \n\t"  
 #define SetExitFuncAddr(srcreg)     "addi x0, " srcreg ", 2 \n\t"  

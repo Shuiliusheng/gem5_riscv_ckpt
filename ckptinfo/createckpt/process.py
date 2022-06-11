@@ -198,6 +198,8 @@ def getLoadInfo(meminfo):
     preload = set()
     prestore = set()
     idx = 0
+    loadnum = 0
+    storenum = 0
     # use two set to record previous store and load
     while idx < len(meminfo):
         line = json.loads(meminfo[idx])
@@ -206,7 +208,7 @@ def getLoadInfo(meminfo):
             size = int(line['size'], 16)
             data = depart_data(line['data'], size)
             idx1 = 0
-
+            loadnum = loadnum + 1
             while idx1 < size:
                 val = saddr + idx1
                 if (val not in prestore) and (val not in preload):
@@ -217,6 +219,7 @@ def getLoadInfo(meminfo):
             saddr = int(line['addr'], 16)
             size = int(line['size'], 16)
             idx1 = 0
+            storenum = storenum + 1
             while idx1 < size:
                 val = saddr + idx1
                 if val not in prestore:
@@ -225,6 +228,7 @@ def getLoadInfo(meminfo):
         idx = idx + 1
     
     loadinfo.sort(key = getaddr)
+    print("loadnum: ",len(loadinfo))
     # the access size of raw loadinfo is byte, so combine consecutive bytes to one access 
     loadinfo = combine(loadinfo)
     return loadinfo
@@ -250,6 +254,8 @@ def getMemRange(meminfo, syscallinfos):
             idx1 = idx1 + 1
         idx = idx + 1
     
+    print("addrnum: ",len(infos))
+
     #add syscall memory access information
     for info in syscallinfos:
         if len(info.data) == 0:
@@ -294,24 +300,31 @@ def getMemRange(meminfo, syscallinfos):
     return memrange
 
 def process(end, reginfo, meminfo, syscallinfo, textinfo, exitinfo):
+    print("start processRegInfo")
     startpoint = processRegInfo(reginfo)
+    print("start processSyscall")
     syscallinfos = processSyscall(syscallinfo)
+    print("start getLoadInfo")
     loadinfo = getLoadInfo(meminfo)
+    print("start getMemRange")
     memrange = getMemRange(meminfo, syscallinfos)
+    print("start writefile")
     writefile(startpoint, syscallinfos, loadinfo, memrange, textinfo, end, exitinfo)
     startpoint.show()
     exitinfo.show()
     print("ckpt sim inst number: ", exitinfo.inst_num - int(startpoint.inst_num, 10))
     print("text range info: ", len(textinfo))
-    # for text in textinfo:
-    #     text.show()
+    for text in textinfo:
+        text.show()
     print("mem range info: ", len(memrange))
-    # for mem in memrange:
-    #     mem.show()
+    for mem in memrange:
+        mem.show()
     print("syscall number: ", len(syscallinfos))
     # for syscall in syscallinfos:
     #     syscall.show()
     print("first load number: ", len(loadinfo))
+    # for load in loadinfo:
+    #     load.show()
 
 
 
@@ -334,6 +347,7 @@ def findexit(file1, meminfo, reginfo, syscallinfo, textinfo, sysplace, end):
             print(line)
             continue
 
+        line = "{" + line.split("{")[1].split("}")[0] + "}"
         if line.find("isSyscall") != -1:
             data = json.loads(line)
             exitinfo.reason = "exitSyscall"
@@ -358,13 +372,32 @@ def findexit(file1, meminfo, reginfo, syscallinfo, textinfo, sysplace, end):
     process(end, reginfo, meminfo, syscallinfo, textinfo, exitinfo)
     file1.seek(fileplace, 0)
 
+def getTextRange(filename):
+    file1 = open(filename) 
+    textinfo = []
+    while 1:
+        line = file1.readline()
+        if not line:
+            break
+    
+        if line.find("textRange") != -1:
+            line = "{" + line.split("{")[1].split("}")[0] + "}"
+            print(line)
+            data = json.loads(line)
+            idx1 = 0
+            while idx1 < len(data['addr']):
+                textinfo.append(Memdata(int(data['addr'][idx1], 16), 0, int(data['size'][idx1], 16)))
+                idx1 = idx1 + 1
+            continue
+    file1.close()
+    return textinfo
 
 def readfile(filename):
+    textinfo = getTextRange(filename)
     file1 = open(filename) 
     meminfo = []
     reginfo = []
     syscallinfo = []
-    textinfo = []
     syscallplace = []
     end = 0
     numline = 0
@@ -380,14 +413,7 @@ def readfile(filename):
             print(numline, line)
             continue
 
-        if line.find("textRange") != -1:
-            print(line)
-            data = json.loads(line)
-            idx1 = 0
-            while idx1 < len(data['addr']):
-                textinfo.append(Memdata(int(data['addr'][idx1], 16), 0, int(data['size'][idx1], 16)))
-                idx1 = idx1 + 1
-            continue
+        line = "{" + line.split("{")[1].split("}")[0] + "}"
         
         if line.find("mem_read") != -1 or line.find("mem_write") != -1 or line.find("mem_atomic") != -1:
             meminfo.append(line)
@@ -420,6 +446,9 @@ def writefile(startpoint, syscallinfos, loadinfo, memrange, textinfo, end, exiti
     bench = os.path.splitext(sys.argv[1])[0]
     ckptname = bench+"_ckpt_"+str(startpoint.inst_num)+".info"
     syscallname = bench+"_ckpt_syscall_"+str(startpoint.inst_num)+".info"
+    
+    if exitinfo.inst_num - int(startpoint.inst_num, 10) < 0:
+        return 0
 
     f1 = open(ckptname, 'wb')
 

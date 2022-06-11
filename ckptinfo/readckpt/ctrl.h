@@ -39,13 +39,13 @@ void exit_fuc()
     exit_record();
     exit(0);
 
-    warmupinst = 0;
+    warmupinst = 30000;
     SetCtrlReg(procTag, &__exitFucAddr, maxinst, warmupinst);
     Load_ALLIntRegs();
     URet();
 }
 
-void init_start()
+void init_start(unsigned long long max_inst, unsigned long long warmup_inst)
 {
     //----------------------------------------------------
     //用于保存一些必要的寄存器值， 同时将necessRegs[400]作为新的sp，用于临时使用
@@ -59,7 +59,7 @@ void init_start()
     startcycle = read_csr_cycle();
     startinst = read_csr_instret();
 	RESET_COUNTER;
-    SetCtrlReg(procTag, &__exitFucAddr, maxinst, warmupinst);
+    SetCtrlReg(procTag, &__exitFucAddr, max_inst, warmup_inst);
 }
 
 void exit_record()

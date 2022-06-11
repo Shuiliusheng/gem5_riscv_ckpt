@@ -2,6 +2,7 @@
 
 if [[ $# < 2 ]]; then
     echo "parameters are not enough!"
+    echo "./run.sh bench ckptinst bench_option"
     exit
 fi
 
@@ -18,12 +19,15 @@ basename=`echo $(basename $bench) |awk -F '.' '{print $1}'`
 logfile="$basename.log"
 
 #riscv-pk stack = 3fbe9000, mmap = 3fbe9000
-stacktop=801017856  #0x2fbe9000
-mmapend=789483520   #0x2f0e9000
+#stacktop=801017856  #0x2fbe9000
+#mmapend=789483520   #0x2f0e9000
+
+stacktop=270582939648  #0x3f00000000
+mmapend=261993005056   #0x3d00000000
 
 maxinsts=500000000
-startinsts=200000000
-endinsts=450000000
+startinsts=10000
+endinsts=100000
 
 debugflags="ShowMemInfo,ShowRegInfo,ShowSyscall"
 

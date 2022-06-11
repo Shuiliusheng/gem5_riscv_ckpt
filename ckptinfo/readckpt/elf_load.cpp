@@ -1,4 +1,4 @@
-#include "info.h"
+#include "ckptinfo.h"
 
 typedef struct {
   uint8_t  e_ident[16];

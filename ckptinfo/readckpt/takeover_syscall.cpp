@@ -1,4 +1,4 @@
-#include "info.h"
+#include "ckptinfo.h"
 
 typedef struct{
     uint64_t pc;
@@ -56,8 +56,8 @@ void takeoverSyscall()
                 dst[runinfo->intregs[12]-1]='\0';
                 printf("%s", (char *)dst);
                 dst[runinfo->intregs[12]-1] = t;
+                printf("\n");
             }
-            printf("\n");
         }
         else if(infos->bufaddr != 0) {   //these syscall also need to write data to bufaddr
             unsigned char *dst = (unsigned char *)infos->bufaddr;

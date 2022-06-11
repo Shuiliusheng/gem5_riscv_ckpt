@@ -1,4 +1,4 @@
-#include "info.h"
+#include "ckptinfo.h"
 #include "ctrl.h"
 
 typedef struct{
@@ -176,8 +176,9 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     runinfo->lastinsts = __csrr_instret();
     runinfo->startcycles = __csrr_cycle();
     runinfo->startinsts = __csrr_instret();
-    init_start();
+    init_start(10000000, 100000);
     //step8: set the testing program's register information
+    Load_fp_regs(StoreFpRegAddr);
     Load_int_regs(StoreIntRegAddr);
 
     //step9: start the testing program
