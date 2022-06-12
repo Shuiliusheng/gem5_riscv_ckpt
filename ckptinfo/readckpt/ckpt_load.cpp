@@ -114,7 +114,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
         }
 
         if(memrange.size !=0){
-            if(memrange.addr < 0xfffffffff){ // a small limit
+            if(memrange.addr < 0xfffffffffff){ // a small limit
                 int* arr = static_cast<int*>(mmap((void *)memrange.addr, memrange.size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, 0, 0));
                 if(memrange.addr != (uint64_t)arr)
                     printf("map range: (0x%lx, 0x%lx), mapped addr: 0x%lx\n", memrange.addr, memrange.addr + memrange.size, arr);
@@ -176,7 +176,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     runinfo->lastinsts = __csrr_instret();
     runinfo->startcycles = __csrr_cycle();
     runinfo->startinsts = __csrr_instret();
-    init_start(10000000, 100000);
+    init_start(100000000, 100000);
     //step8: set the testing program's register information
     Load_fp_regs(StoreFpRegAddr);
     Load_int_regs(StoreIntRegAddr);

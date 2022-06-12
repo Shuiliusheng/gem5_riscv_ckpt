@@ -39,6 +39,7 @@
 #include "sim/syscall_emul.hh"
 #include "debug/ShowSyscall.hh"
 #include <stdio.h>
+#include "sim/ckpt_collect.hh"
 
 namespace gem5
 {
@@ -95,8 +96,15 @@ EmuLinux::syscall(ThreadContext *tc)
         RegVal a2 = tc->readIntReg(12);
         RegVal a3 = tc->readIntReg(13);
         RegVal a4 = tc->readIntReg(14);
-        DPRINTF(ShowSyscall, "{\"type\":\"syscall enter\", \"pc\": \"0x%llx\", \"sysnum\": \"0x%x\", \"param\": [ \"0x%llx\", \"0x%llx\", \"0x%llx\", \"0x%llx\", \"0x%llx\" ]}\n", tc->pcState().pc(), num, a0, a1, a2, a3, a4);
-        // printf("\"type\":\"syscall enter\", \"pc\": 0x%llx, \"sysnum\": %llu, \"param\": 0x%llx, a1: 0x%llx, a2: 0x%llx, a3: 0x%llx, a4: 0x%llx\n", tc->pcState().pc(), num, a0, a1, a2, a3, a4);
+        // DPRINTF(ShowSyscall, "{\"type\":\"syscall enter\", \"pc\": \"0x%llx\", \"sysnum\": \"0x%x\", \"param\": [ \"0x%llx\", \"0x%llx\", \"0x%llx\", \"0x%llx\", \"0x%llx\" ]}\n", tc->pcState().pc(), num, a0, a1, a2, a3, a4);
+        vector<uint64_t> params;
+        params.push_back(a0);
+        params.push_back(a1);
+        params.push_back(a2);
+        params.push_back(a3);
+        params.push_back(a4);
+        ckpt_add_sysenter(tc->pcState().pc(), num, params);
+        params.clear();
     }
 
     if (dynamic_cast<RiscvProcess64 *>(process))
@@ -129,15 +137,17 @@ unameFunc64(SyscallDesc *desc, ThreadContext *tc, VPtr<Linux::utsname> name)
         unsigned char *outdata = (unsigned char *)(&unametemp);
         unsigned long long dstaddr = tc->readIntReg(10);
         unsigned long long res = 0;
-        char *str = (char *)malloc(1000 + outsize*8); //
-        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
-        for(int i=0;i<outsize-1;i++){
-            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
-        }
-	sprintf(str, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-        DPRINTF1(ShowSyscall, "%s\n", str);
-        printf("%s\n", str);
-        free(str);
+        // char *str = (char *)malloc(1000 + outsize*8); //
+        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        // for(int i=0;i<outsize-1;i++){
+        //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        // }
+	    // sprintf(str, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // DPRINTF1(ShowSyscall, "%s\n", str);
+        // printf("%s\n", str);
+        // free(str);
+
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
     }
 
     return 0;

@@ -101,7 +101,7 @@ AtomicSimpleCPU::AtomicSimpleCPU(const AtomicSimpleCPUParams &p)
         ::gem5::debug::ShowSyscall.enable();
     }
 
-    printf("start ckpt: %d, end ckpt: %d, interval: %d\n", p.ckpt_startinsts, p.ckpt_endinsts, p.ckptinsts);
+    printf("start ckpt: %ld, end ckpt: %ld, interval: %ld\n", p.ckpt_startinsts, p.ckpt_endinsts, p.ckptinsts);
 
 }
 
@@ -435,7 +435,7 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t *data, unsigned size,
                 locked = true;
             }
             if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo) && startlog) { 
-                addload(addr, data, size);
+                ckpt_addload(addr, data, size);
             }
             return fault;
         }
@@ -466,7 +466,7 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
         data = zero_array;
     }
     if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo) && startlog) { 
-        addstore(addr, size);
+        ckpt_addstore(addr, size);
     }
 
     // use the CPU's statically allocated write request and packet objects
@@ -624,7 +624,7 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
     }
 
     if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo) && startlog) { 
-        addload(addr, data, size);
+        ckpt_addload(addr, data, size);
     }
 
     //If there's a fault and we're not doing prefetch, return it
@@ -702,7 +702,7 @@ AtomicSimpleCPU::tick()
                 //}
             }
 
-            addinst(thread->pcState().pc());
+            ckpt_addinst(thread->pcState().pc());
 
             preExecute();
 
@@ -751,7 +751,7 @@ AtomicSimpleCPU::tick()
                     if(!isInPre && needshowFirst && !isInPre1 && startlog){
                         needshowFirst = false;
                         printf("{\"type\": \"ckptExitInst\", \"inst_num\": \"%ld\", \"inst_pc\": \"0x%lx\"}\n", t_info.numInst, nowpc);
-                        detectOver(t_info.numInst, nowpc);
+                        ckpt_detectOver(t_info.numInst, nowpc);
                     }    
                     
                     preinsts.insert(nowpc);

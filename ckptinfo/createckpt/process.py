@@ -31,7 +31,7 @@ class SyscallInfo:
 
     def show1(self):
         print("sysinfo: " + self.pc, self.num, self.name, self.params[0], self.params[1], self.params[2], self.hasret, self.ret, self.bufaddr, len(self.data))
-        print("\t data: ", self.data)
+        # print("\t data: ", self.data)
 
 class StartPoint:
     inst_num = ""
@@ -317,11 +317,11 @@ def process(end, reginfo, meminfo, syscallinfo, textinfo, exitinfo):
     for text in textinfo:
         text.show()
     print("mem range info: ", len(memrange))
-    for mem in memrange:
-        mem.show()
+    # for mem in memrange:
+    #     mem.show()
     print("syscall number: ", len(syscallinfos))
-    # for syscall in syscallinfos:
-    #     syscall.show()
+    for syscall in syscallinfos:
+        syscall.show1()
     print("first load number: ", len(loadinfo))
     # for load in loadinfo:
     #     load.show()

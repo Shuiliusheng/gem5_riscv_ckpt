@@ -90,6 +90,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
         memrange = minfos[i];
         extra.size = 0;
         extra.addr = 0;
+	printf("memrange info: 0x%lx, 0x%lx\n", memrange.addr, memrange.addr+memrange.size);
         uint64_t msaddr = memrange.addr, meaddr = memrange.addr + memrange.size;
         uint64_t tsaddr = text_seg.addr, teaddr = text_seg.addr + text_seg.size;
         totalsize += memrange.size;
