@@ -124,7 +124,7 @@ def readfile(filename):
             continue
 
         if words['type'] == "syscall":
-            sinfo = SyscallInfo(words['pc'], words['num'], words['name'], words['params'], words['hasret'] == "1", words['ret'], words['data'], words['bufaddr'])
+            sinfo = SyscallInfo(words['pc'], words['sysnum'], words['sysname'], words['params'], words['hasret'] == "1", words['ret'], words['data'], words['bufaddr'])
             syscallinfo.append(sinfo)
             continue
 
@@ -140,7 +140,12 @@ def readfile(filename):
             memrange = []
             textrange = []
             reginfo = []
-            
+
+    if len(reginfo) > 0:
+        startpoint.intdata = reginfo[0]['data']
+        startpoint.fpdata = reginfo[1]['data']
+        writefile(startpoint, syscallinfo, loadinfo, memrange, textrange)
+        
             
     file1.close()
 
@@ -190,6 +195,7 @@ def writefile(startpoint, syscallinfos, loadinfo, memrange, textinfo):
     invalid_addr = 0xffffffff
     f2 = open(syscallname, 'wb')
     #write syscall information
+    print("syscallnum: ", len(syscallinfos))
     f2.write(toBytes(len(syscallinfos), 8))    ## write number
     for syscall in syscallinfos:
         f2.write(toBytes(int(syscall.pc,16), 8))

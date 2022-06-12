@@ -13,6 +13,14 @@ typedef struct{
     uint64_t exit_cause;
 }SimInfo;
 
+typedef struct{
+    uint64_t pc;
+    uint64_t num;
+    uint64_t p0, p1, p2;
+    uint64_t hasret, ret;
+    uint64_t bufaddr, data_offset, data_size;
+}SyscallInfo;
+
 void read_ckptsyscall(char filename[])
 {
     uint64_t  totalcallnum;
@@ -24,6 +32,14 @@ void read_ckptsyscall(char filename[])
     }
     
     fread(&totalcallnum, sizeof(uint64_t), 1, fp);
+    SyscallInfo infos;
+    for(int i=0;i<totalcallnum;i++){
+        fread(&infos, sizeof(SyscallInfo), 1, fp);
+
+        printf("syscall, pc: 0x%lx, num: 0x%lx, param: 0x%lx, 0x%lx, 0x%lx, hasret: %d, ret: 0x%lx, bufaddr: 0x%lx, size: %d, offset: 0x%lx\n", infos.pc, infos.num, infos.p0, infos.p1, infos.p2, infos.hasret, infos.ret, infos.bufaddr, infos.data_size, infos.data_offset);
+    }
+
+
     fclose(fp);
     printf("--- step 5, syscall totalcallnum: %d ---\n", totalcallnum);
 }
@@ -47,11 +63,13 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     MemRangeInfo textinfo;
     uint64_t numinfos = 0, textsize = 0;
     fread(&numinfos, 8, 1, p);
+    printf("textinfo: %d, size: %d\n", numinfos, textsize);
     for(int i=0;i<numinfos;i++){
         fread(&textinfo, sizeof(MemRangeInfo), 1, p);
+        printf("textrange info: 0x%lx, 0x%lx\n", textinfo.addr, textinfo.addr+textinfo.size);
         textsize += textinfo.size;
     }
-    printf("textinfo: %d, size: %d\n", numinfos, textsize);
+    
 
     fseek(p, 16*numinfos+8, SEEK_SET);
 
@@ -67,15 +85,15 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     fread(&intregs[0], 8, 32, p);
     fread(&fpregs[0], 8, 32, p);
 
-    printf("--- integer registers ---\n");
-    for(int i=0;i<32;i++){
-        printf("int reg %d: 0x%lx\n", i, intregs[i]);
-    }
+    // printf("--- integer registers ---\n");
+    // for(int i=0;i<32;i++){
+    //     printf("int reg %d: 0x%lx\n", i, intregs[i]);
+    // }
 
-    printf("--- float registers ---\n");
-    for(int i=0;i<32;i++){
-        printf("float reg %d: 0x%lx\n", i, fpregs[i]);
-    }
+    // printf("--- float registers ---\n");
+    // for(int i=0;i<32;i++){
+    //     printf("float reg %d: 0x%lx\n", i, fpregs[i]);
+    // }
 
 
     printf("--- step 2, read integer and float registers ---\n");
@@ -90,7 +108,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
         memrange = minfos[i];
         extra.size = 0;
         extra.addr = 0;
-	printf("memrange info: 0x%lx, 0x%lx\n", memrange.addr, memrange.addr+memrange.size);
+	    printf("memrange info: 0x%lx, 0x%lx\n", memrange.addr, memrange.addr+memrange.size);
         uint64_t msaddr = memrange.addr, meaddr = memrange.addr + memrange.size;
         uint64_t tsaddr = text_seg.addr, teaddr = text_seg.addr + text_seg.size;
         totalsize += memrange.size;
@@ -130,5 +148,5 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     fclose(p);
     
     // step5: 加载syscall的执行信息到内存中
-    // read_ckptsyscall(ckpt_sysinfo);
+    read_ckptsyscall(ckpt_sysinfo);
 }
