@@ -123,7 +123,7 @@ class CkptInfo{
 
     void saveDetailInfo();
     void saveCkptInfo();
-    void saveSysInfo();
+    void saveSysInfo(FILE *p);
 };
 
 

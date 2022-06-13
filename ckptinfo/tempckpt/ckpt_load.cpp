@@ -21,27 +21,18 @@ typedef struct{
     uint64_t bufaddr, data_offset, data_size;
 }SyscallInfo;
 
-void read_ckptsyscall(char filename[])
+void read_ckptsyscall(FILE *fp)
 {
     uint64_t  totalcallnum;
-    FILE *fp=NULL;
-    fp = fopen(filename,"rb");
-    if(fp == NULL) {
-        printf("cannot open %s to read\n", filename);
-        exit(1);
-    }
-    
     fread(&totalcallnum, sizeof(uint64_t), 1, fp);
     SyscallInfo infos;
     for(int i=0;i<totalcallnum;i++){
         fread(&infos, sizeof(SyscallInfo), 1, fp);
 
-        printf("syscall, pc: 0x%lx, num: 0x%lx, param: 0x%lx, 0x%lx, 0x%lx, hasret: %d, ret: 0x%lx, bufaddr: 0x%lx, size: %d, offset: 0x%lx\n", infos.pc, infos.num, infos.p0, infos.p1, infos.p2, infos.hasret, infos.ret, infos.bufaddr, infos.data_size, infos.data_offset);
+        printf("syscall, pc: 0x%lx, num: 0x%lx, param: 0x%lx, 0x%lx, 0x%lx, hasret: %ld, ret: 0x%lx, bufaddr: 0x%lx, size: %ld, offset: 0x%lx\n", infos.pc, infos.num, infos.p0, infos.p1, infos.p2, infos.hasret, infos.ret, infos.bufaddr, infos.data_size, infos.data_offset);
     }
-
-
     fclose(fp);
-    printf("--- step 5, syscall totalcallnum: %d ---\n", totalcallnum);
+    printf("--- step 5, syscall totalcallnum: %ld ---\n", totalcallnum);
 }
 
 
@@ -63,7 +54,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     MemRangeInfo textinfo;
     uint64_t numinfos = 0, textsize = 0;
     fread(&numinfos, 8, 1, p);
-    printf("textinfo: %d, size: %d\n", numinfos, textsize);
+    printf("textinfo: %ld, size: %ld\n", numinfos, textsize);
     for(int i=0;i<numinfos;i++){
         fread(&textinfo, sizeof(MemRangeInfo), 1, p);
         printf("textrange info: 0x%lx, 0x%lx\n", textinfo.addr, textinfo.addr+textinfo.size);
@@ -74,7 +65,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     fseek(p, 16*numinfos+8, SEEK_SET);
 
     fread(&siminfo, sizeof(siminfo), 1, p);
-    printf("siminfo, start: %d, simNum: %d, exitpc: 0x%lx, cause: %d\n", siminfo.start, siminfo.simNum, siminfo.exitpc, siminfo.exit_cause);
+    printf("siminfo, start: %ld, simNum: %ld, length: %ld, exitpc: 0x%lx, cause: %ld\n", siminfo.start, siminfo.simNum, siminfo.exit_cause>>2, siminfo.exitpc, siminfo.exit_cause%4);
    
     //step 1: read npc
     fread(&npc, 8, 1, p);
@@ -99,7 +90,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     printf("--- step 2, read integer and float registers ---\n");
     //step 3: read memory range information and map these ranges
     fread(&mrange_num, 8, 1, p);
-    printf("--- step 3, read memory range information and do map, range num: %d ---\n", mrange_num);
+    printf("--- step 3, read memory range information and do map, range num: %ld ---\n", mrange_num);
     MemRangeInfo *minfos = (MemRangeInfo *)malloc(sizeof(MemRangeInfo)*mrange_num);
     fread(&minfos[0], sizeof(MemRangeInfo), mrange_num, p);
     unsigned int totalsize = 0;
@@ -132,21 +123,24 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     }
     free(minfos);
 
-    printf("total map memrange size: %d, num: %d\n", totalsize, mrange_num);
+    printf("total map memrange size: %ld, num: %ld\n", totalsize, mrange_num);
 
     //step 4: read first load information, and store these data to memory
     fread(&loadnum, 8, 1, p);
-    printf("--- step 4, read first load information and init these loads, load num: %d ---\n", loadnum);
+    printf("--- step 4, read first load information and init these loads, load num: %ld ---\n", loadnum);
     if(showload){
         LoadInfo *linfos = (LoadInfo *)malloc(sizeof(LoadInfo)*loadnum);
         fread(&linfos[0], sizeof(LoadInfo), loadnum, p);
         for(int j=0;j<loadnum;j++){
-            printf("load %d: addr: 0x%lx, size: %d, data: 0x%lx\n", j, linfos[j].addr, linfos[j].size, linfos[j].data);
+            printf("load %d: addr: 0x%lx, size: %ld, data: 0x%lx\n", j, linfos[j].addr, linfos[j].size, linfos[j].data);
         }
         free(linfos);
     }
-    fclose(p);
+    else {
+        uint64_t place = ftell(p) + loadnum*24;
+        fseek(p, place, SEEK_SET);
+    }
     
     // step5: 加载syscall的执行信息到内存中
-    read_ckptsyscall(ckpt_sysinfo);
+    read_ckptsyscall(p);
 }

@@ -14,27 +14,19 @@ typedef struct{
     uint64_t exit_cause;
 }SimInfo;
 
-void read_ckptsyscall(char filename[])
+void read_ckptsyscall(FILE *fp)
 {
-    uint64_t filesize, allocsize, alloc_vaddr;
-    FILE *fp=NULL;
-    fp = fopen(filename,"rb");
-    if(fp == NULL) {
-        printf("cannot open %s to read\n", filename);
-        exit(1);
-    }
-    
+    uint64_t filesize, allocsize, alloc_vaddr, nowplace;
+
+    nowplace = ftell(fp);
     fseek(fp, 0, SEEK_END);
-    filesize = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
+    filesize = ftell(fp) - nowplace;
+    fseek(fp, nowplace, SEEK_SET);
 
     allocsize = filesize + (4096-filesize%4096);
     alloc_vaddr = (uint64_t)mmap((void *)0x2000000, allocsize, PROT_READ | PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, 0);    
     
-    if (fread((void *)alloc_vaddr, filesize, 1, fp) != 1) {
-        printf("cannot read file: %s\n", filename);
-        exit(1);
-    }
+    fread((void *)alloc_vaddr, filesize, 1, fp);
     fclose(fp);
 
     RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
@@ -47,7 +39,7 @@ void read_ckptsyscall(char filename[])
 
 
 
-void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
+void read_ckptinfo(char ckptinfo[])
 {
     uint64_t npc, mrange_num=0, loadnum = 0, temp=0;
     MemRangeInfo memrange, extra;
@@ -69,7 +61,7 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     fseek(p, 16*temp+8, SEEK_SET);
 
     fread(&siminfo, sizeof(siminfo), 1, p);
-    printf("sim slice info, start: %d, simNum: %d, exitpc: 0x%lx, cause: %d\n", siminfo.start, siminfo.simNum, siminfo.exitpc, siminfo.exit_cause);
+    printf("sim slice info, start: %ld, simNum: %ld, rawLength: %ld, exitpc: 0x%lx, cause: %ld\n", siminfo.start, siminfo.simNum, siminfo.exit_cause>>2, siminfo.exitpc, siminfo.exit_cause%4);
     runinfo->exitpc = siminfo.exitpc;
     runinfo->exit_cause = siminfo.exit_cause % 4;
     uint64_t runLength = siminfo.exit_cause >> 2;
@@ -145,11 +137,10 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
             case 8: *((uint64_t *)linfos[j].addr) = linfos[j].data; break;
         }
     }
-    fclose(p);
     free(linfos);
     
     //step5: 加载syscall的执行信息到内存中
-    read_ckptsyscall(ckpt_sysinfo);
+    read_ckptsyscall(p);
 
     //try to replace exit inst if syscall totalnum == 0
     if(runinfo->totalcallnum == 0 && runinfo->exit_cause == Cause_ExitInst) {
@@ -179,6 +170,9 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     runinfo->startinsts = __csrr_instret();
     if(runLength != 0)
         init_start(runLength, runLength/10);
+    else {
+        init_start(siminfo.simNum, siminfo.simNum/10);
+    }
     //step8: set the testing program's register information
     Load_fp_regs(StoreFpRegAddr);
     Load_int_regs(StoreIntRegAddr);

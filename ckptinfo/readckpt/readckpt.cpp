@@ -3,9 +3,9 @@
 
 int main(int argc, char **argv)
 {
-    if(argc < 3){
+    if(argc < 2){
         printf("parameters are not enough!\n");
-        printf("./readckpt.riscv ckptinfo.log ckpt_syscallinfo.log exe\n");
+        printf("./readckpt.riscv ckptinfo.log exe\n");
         return 0;
     }
 
@@ -15,7 +15,7 @@ int main(int argc, char **argv)
         return 0;
     }
     printf("stack addr: 0x%lx\n", &alloc_vaddr);
-    loadelf(argv[3], argv[1]);
-    read_ckptinfo(argv[1], argv[2]);
+    loadelf(argv[2], argv[1]);
+    read_ckptinfo(argv[1]);
     return 0;
 }

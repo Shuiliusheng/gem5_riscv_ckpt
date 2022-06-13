@@ -72,7 +72,7 @@ uint64_t loadelf(char * progname, char *ckptinfo)
     MemRangeInfo textinfo;
     uint64_t numinfos = 0;
     fread(&numinfos, 8, 1, fp1);
-    printf("textinfo number: %d\n", numinfos);
+    printf("textinfo number: %ld\n", numinfos);
 
 	FILE *fp = fopen(progname, "r");
 	if (fp == 0) {

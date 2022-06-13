@@ -50,7 +50,7 @@ extern MemRangeInfo data_seg, text_seg;
 void takeoverSyscall();
 uint64_t loadelf(char * progname, char *ckptinfo);
 void read_ckptsyscall(char filename[]);
-void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[]);
+void read_ckptinfo(char ckptinfo[]);
 
 //读写临时寄存器 + 跳转临时寄存器
 #define WriteRTemp(srcreg, rtempnum) "ori x0, " srcreg ", 8+" #rtempnum " \n\t"
