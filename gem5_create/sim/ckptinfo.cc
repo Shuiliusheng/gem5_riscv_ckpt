@@ -325,7 +325,7 @@ void CkptInfo::saveCkptInfo()
   mem[0] = startnum;
   mem[1] = simNums;
   mem[2] = exit_pc;
-  mem[3] = 2;
+  mem[3] = 2 + (length << 2);
   mem[4] = npc;
   fwrite(&mem[0], sizeof(uint64_t), 5, p);
   fwrite(&intregs[0], sizeof(uint64_t), 32, p);

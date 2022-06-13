@@ -71,7 +71,8 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     fread(&siminfo, sizeof(siminfo), 1, p);
     printf("sim slice info, start: %d, simNum: %d, exitpc: 0x%lx, cause: %d\n", siminfo.start, siminfo.simNum, siminfo.exitpc, siminfo.exit_cause);
     runinfo->exitpc = siminfo.exitpc;
-    runinfo->exit_cause = siminfo.exit_cause;
+    runinfo->exit_cause = siminfo.exit_cause % 4;
+    uint64_t runLength = siminfo.exit_cause >> 2;
 
     //step 1: read npc
     fread(&npc, 8, 1, p);
@@ -176,7 +177,8 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     runinfo->lastinsts = __csrr_instret();
     runinfo->startcycles = __csrr_cycle();
     runinfo->startinsts = __csrr_instret();
-    init_start(100000000, 100000);
+    if(runLength != 0)
+        init_start(runLength, runLength/10);
     //step8: set the testing program's register information
     Load_fp_regs(StoreFpRegAddr);
     Load_int_regs(StoreIntRegAddr);
