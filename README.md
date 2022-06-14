@@ -95,31 +95,15 @@ Checkpoint Create and Restore (RISC-V)
 3. 软件实现
 
    - 模拟器支持
-
-     - 记录ckpt信息：根据设置的ckpt的间隔指令数，统计访存信息，系统调用信息和寄存器状态
-
-       ```json
-       {"type": "mem_read", "pc": "0x200786", "addr": "0x7ffffdf8", "size": "0x8", "data": "0x1"}
-       
-       {"type": "mem_write", "pc": "0x200792", "addr": "0x26ab60", "size": "0x4", "data": "0x0"}
-       
-       {"type":"syscall enter", "pc": "0x21b354", "sysnum": "0x50", "param": [ "0x1", "0x7ffff670", "0x7ffff670", "0x0", "0x5e8" ]}
-       
-       {"type":"syscall info", "info": "setdata", "pc": "0x21b354", "buf": "0x7ffff670", "bytes": "0x80", "ret": "0x0", "data": [ "0xa","0x0","0x0","0x0","0x0","0x0","0x0","0x0","0x3","0x0","0x0"]}
-       
-       {"type":"syscall return", "sysnum": "0x50", "sysname":"(fstat(0, 0x7ffff670))", "pc": "0x21b354", "res":"has ret", "val": "0x0"}
-       
-       {"type": "int_regs", "inst_num": "6000", "inst_pc": "0x21070e", "npc": "0x210710", "data": [ "0x0", "0x2118e4", "0x7ffff700", "0x26b1b0", "0x26d710", "0xa", "0x7fffffde", "0x1", "0x2", "0x264000", "0x269218", "0x26e2e0", "0x2", "0x26e2e0", "0x1000", "0xfffffffffbad2a84", "0x64", "0xffffffffffffffff", "0x263a88", "0x263d28", "0x1", "0x263a88", "0x248ea0", "0x269218", "0x20", "0x249b58", "0x1", "0x248ea2", "0x0", "0x1", "0x0", "0x20" ]}
-       
-       {"type": "textRange", "addr": [ "0x200000", "0x204000", "0x207000", "0x220000", "0x229000", "0x22b000", "0x230000", "0x23c000" ], "size": [ "0x1000", "0x2000", "0x13000", "0x2000", "0x1000", "0x4000", "0x2000", "0x1000" ] }
-
-       {"type": "isSyscall", "inst_num": "357", "pc": "0x22c224"}
-
-       {"type": "ckptExitInst", "inst_num": "28993", "inst_pc": "0x200642"}
-       ```
-
-     - 支持恢复ckpt：增加一些额外的指令，支持临时寄存器的读写跳转，支持统计程序执行的指令数（到达指令数后，结束执行）
-
-       ​
-
-   - restore软件支持
+   - 模拟器支持直接生成checkpoint文件，并且支持从文件中读取生成ckpt的控制信息
+    - 执行参数：build/RISCV/gem5.opt --debug-flag=CreateCkpt --debug-file=temp ./configs/example/se.py --mem-type=SimpleMemory --mem-size=8GB --ckptsetting=settings -c bwaves.riscv
+    - setting文件格式
+      - mmapend/stacktop指定运行时的一些内存地址信息
+      - ckptprefix: 指定输出结果的目录和文件名前缀
+      - ckptctrl: (startckpt interval warmupnum times)
+    ```c
+      mmapend: 261993005056
+      stacktop: 270582939648
+      ckptprefix: ./res/bwaves
+      ckptctrl: 10000 10000 0 4
+    ```
