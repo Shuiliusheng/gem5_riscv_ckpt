@@ -10,7 +10,7 @@
 #include <string.h>
 #include <algorithm>
 #include <stdlib.h>
-#include "debug/ShowSyscall.hh"
+#include "debug/CreateCkpt.hh"
 #include "base/trace.hh"
 using namespace std;
 
@@ -58,8 +58,8 @@ class SyscallInfo{
 class CkptInfo{
   public:
     char filename[300];
-    uint64_t startnum, simNums, length, exit_pc, pc, npc;
-    uint64_t intregs[32], fpregs[32];
+    uint64_t startnum, simNums, length, exit_pc, pc, npc, warmup;
+    uint64_t intregs[32], fpregs[32], instinfo[10], instinfo1[10];
     uint64_t textsize, memsize;
     vector<LoadInfo> loads;
     vector<FirstLoadInfo> firstloads;
@@ -69,7 +69,7 @@ class CkptInfo{
     set<uint64_t> preAccess;
     set<uint64_t> textAccess;
 
-    CkptInfo(uint64_t startnum, uint64_t length, uint64_t intregs[], uint64_t fpregs[], uint64_t pc, uint64_t npc, char filename[]){
+    CkptInfo(uint64_t startnum, uint64_t length, uint64_t warmup, uint64_t intregs[], uint64_t fpregs[], uint64_t pc, uint64_t npc, char filename[], uint64_t instinfo[]){
       this->startnum = startnum;
       for(int i=0;i<32;i++){
         this->intregs[i] = intregs[i];
@@ -85,12 +85,17 @@ class CkptInfo{
       this->length = length;
       this->pc = pc;
       this->npc = npc;
+      this->warmup = warmup;
 
       if(strlen(filename) < 1) {
         strcpy(this->filename, "bench");
       }
       else {
         strcpy(this->filename, filename);
+      }
+
+      for(int i=0;i<10;i++){
+        this->instinfo[i] = instinfo[i];
       }
     }
     ~CkptInfo(){
@@ -117,7 +122,7 @@ class CkptInfo{
     void getFistloads();
     uint64_t getRange(set<uint64_t> &addrs, vector<CodeRange> &ranges);
     
-    bool detectOver(uint64_t exit_place, uint64_t exit_pc);
+    bool detectOver(uint64_t exit_place, uint64_t exit_pc, uint64_t instinfo[]);
     void showCkptInfo();
     void showSysInfo();
 

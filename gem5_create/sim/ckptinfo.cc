@@ -159,7 +159,7 @@ uint64_t CkptInfo::getRange(set<uint64_t> &addrs, vector<CodeRange> &ranges)
   return totalsize;
 }
 
-bool CkptInfo::detectOver(uint64_t exit_place, uint64_t exit_pc) 
+bool CkptInfo::detectOver(uint64_t exit_place, uint64_t exit_pc, uint64_t instinfo[]) 
 {
   bool isOver = false;
   if(exit_place >= this->startnum + this->length) {
@@ -169,6 +169,10 @@ bool CkptInfo::detectOver(uint64_t exit_place, uint64_t exit_pc)
   }
   if(!isOver) {
     return false;
+  }
+  //update inst infor
+  for(int i=0;i<10;i++){
+    this->instinfo[i] = instinfo[i] - this->instinfo[i];
   }
 
   //add syscall buffer addr information to all addresses
@@ -182,9 +186,7 @@ bool CkptInfo::detectOver(uint64_t exit_place, uint64_t exit_pc)
   this->getFistloads();
   this->textsize = this->getRange(this->textAccess, this->textrange);
   this->memsize = this->getRange(this->preAccess, this->memrange);
-  // showCkptInfo();
-  // showSysInfo();
-  
+
   saveDetailInfo();
   saveCkptInfo();
   // saveSysInfo();
@@ -212,7 +214,7 @@ void CkptInfo::showSysInfo()
 void CkptInfo::saveDetailInfo()
 {
   char dstname[300];
-  sprintf(dstname, "%s_infor_%ld.txt", this->filename, this->startnum);
+  sprintf(dstname, "%s_infor_%ld.txt", this->filename, this->startnum + this->warmup);
 
   FILE *p=NULL;
   p = fopen(dstname, "w");
@@ -220,8 +222,8 @@ void CkptInfo::saveDetailInfo()
     printf("cannot open %s for write\n", dstname);
   }
   
-  fprintf(p, "ckptinfo, startnum: %ld, exitnum: %ld, length: %ld\n pc: 0x%lx, npc: 0x%lx, exitpc: 0x%lx\n", startnum, simNums, length, pc, npc, exit_pc);
-  fprintf(p, "text range num: %ld, mem range num: %ld, first load num: %ld, syscallnum: %ld\n\n", textrange.size(), memrange.size(), firstloads.size(), sysinfos.size());
+  fprintf(p, "ckptinfo, startnum: %lld, exitnum: %lld, length: %lld\n, warmup: %lld, pc: 0x%lx, npc: 0x%lx, exitpc: 0x%lx\n", startnum, simNums, length-warmup, warmup, pc, npc, exit_pc);
+  fprintf(p, "text range num: %lld, mem range num: %lld, first load num: %lld, syscallnum: %lld\n\n", textrange.size(), memrange.size(), firstloads.size(), sysinfos.size());
   
   fprintf(p, "\n-- integer register value: --\n");
   for(int i=0;i<32;i++){
@@ -233,22 +235,27 @@ void CkptInfo::saveDetailInfo()
       fprintf(p, "reg %d: 0x%lx\n", i, fpregs[i]);
   }
 
-  fprintf(p, "\n-- text range information: %ld KB --\n", textsize >> 10);
+  fprintf(p, "\n-- text range information: %lld KB --\n", textsize >> 10);
   for(int i=0;i<textrange.size();i++){
-      fprintf(p, "text range %d: 0x%lx, %ld KB\n", i, textrange[i].addr, textrange[i].size >> 10);
+      fprintf(p, "text range %d: 0x%lx, %lld KB\n", i, textrange[i].addr, textrange[i].size >> 10);
   }
 
-  fprintf(p, "\n-- mem range information: %ld KB --\n", memsize >> 10);
+  fprintf(p, "\n-- mem range information: %lld KB --\n", memsize >> 10);
   for(int i=0;i<memrange.size();i++){
-      fprintf(p, "mem range %d: 0x%lx, %ld KB\n", i, memrange[i].addr, memrange[i].size >> 10);
+      fprintf(p, "mem range %d: 0x%lx, %lld KB\n", i, memrange[i].addr, memrange[i].size >> 10);
   }  
+
+  fprintf(p, "\n--running instruction information --\n");
+  fprintf(p, "isLoad: %lld, isStore: %lld, isAtomic: %lld\n", instinfo[0], instinfo[1], instinfo[2]); 
+  fprintf(p, "isControl: %lld, isCall: %lld, isReturn: %lld\n", instinfo[3], instinfo[4], instinfo[5]); 
+  fprintf(p, "isCondCtrl: %lld, isUncondCtrl: %lld, isIndirectCtrl: %lld\n", instinfo[6], instinfo[7], instinfo[8]); 
   fclose(p);
 }
 
 void CkptInfo::saveCkptInfo()
 {
   char dstname[300];
-  sprintf(dstname, "%s_ckpt_%ld.info", this->filename, this->startnum);
+  sprintf(dstname, "%s_ckpt_%ld.info", this->filename, this->startnum + this->warmup);
 
   FILE *p=NULL;
   p = fopen(dstname, "wb");
@@ -263,9 +270,9 @@ void CkptInfo::saveCkptInfo()
   //start information
   uint64_t mem[5];
   mem[0] = startnum;
-  mem[1] = simNums;
+  mem[1] = simNums + (warmup << 32);
   mem[2] = exit_pc;
-  mem[3] = 2 + (length << 2);
+  mem[3] = 2 + ((length-warmup) << 2);
   mem[4] = npc;
   fwrite(&mem[0], sizeof(uint64_t), 5, p);
   fwrite(&intregs[0], sizeof(uint64_t), 32, p);

@@ -31,7 +31,7 @@
 
 #include "base/types.hh"
 #include "sim/syscall_debug_macros.hh"
-#include "debug/ShowSyscall.hh"
+#include "debug/CreateCkpt.hh"
 #include "sim/ckpt_collect.hh"
 
 namespace gem5
@@ -53,12 +53,12 @@ SyscallDesc::doSyscall(ThreadContext *tc)
     else
         DPRINTF_SYSCALL(Base, "Returned %d.\n", retval.encodedValue());
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) { 
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) { 
         RegVal num = tc->readIntReg(17);
         // if (retval.suppressed())
-        //     DPRINTF(ShowSyscall, "{\"type\":\"syscall return\", \"sysnum\": \"0x%x\", \"sysname\":\"(%s)\", \"pc\": \"0x%llx\", \"res\":\"no ret\"\n", num, dumper(name(), tc).c_str(), tc->pcState().pc());
+        //     DPRINTF(CreateCkpt, "{\"type\":\"syscall return\", \"sysnum\": \"0x%x\", \"sysname\":\"(%s)\", \"pc\": \"0x%llx\", \"res\":\"no ret\"\n", num, dumper(name(), tc).c_str(), tc->pcState().pc());
         // else
-        //     DPRINTF(ShowSyscall, "{\"type\":\"syscall return\", \"sysnum\": \"0x%x\", \"sysname\":\"(%s)\", \"pc\": \"0x%llx\", \"res\":\"has ret\", \"val\": \"0x%llx\"}\n", num, dumper(name(), tc).c_str(), tc->pcState().pc(), retval.encodedValue());
+        //     DPRINTF(CreateCkpt, "{\"type\":\"syscall return\", \"sysnum\": \"0x%x\", \"sysname\":\"(%s)\", \"pc\": \"0x%llx\", \"res\":\"has ret\", \"val\": \"0x%llx\"}\n", num, dumper(name(), tc).c_str(), tc->pcState().pc(), retval.encodedValue());
 
         ckpt_add_sysret(tc->pcState().pc(), dumper(name(), tc), !retval.suppressed(), retval.encodedValue());
     }

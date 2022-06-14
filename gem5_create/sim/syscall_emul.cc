@@ -395,7 +395,7 @@ getcwdFunc(SyscallDesc *desc, ThreadContext *tc,
 
     buf.copyOut(tc->getVirtProxy());
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
         unsigned outsize = size; 
         unsigned char *outdata = (unsigned char *)(buf.bufferPtr());
         unsigned long long dstaddr = (unsigned long long)buf_ptr;
@@ -405,7 +405,7 @@ getcwdFunc(SyscallDesc *desc, ThreadContext *tc,
         // for(int i=0;i<outsize-1;i++){
         //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
         // }
-        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
@@ -469,7 +469,7 @@ readlinkFunc(SyscallDesc *desc, ThreadContext *tc,
 
     buf.copyOut(tc->getVirtProxy());
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall) && result != -1) {
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt) && result != -1) {
         unsigned outsize = result; 
         unsigned char *outdata = (unsigned char *)(buf.bufferPtr());
         unsigned long long dstaddr = (unsigned long long)buf_ptr;
@@ -479,7 +479,7 @@ readlinkFunc(SyscallDesc *desc, ThreadContext *tc,
         // for(int i=0;i<outsize-1;i++){
         //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
         // }
-        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);

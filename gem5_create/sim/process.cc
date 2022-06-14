@@ -65,7 +65,9 @@
 #include "sim/redirect_path.hh"
 #include "sim/syscall_desc.hh"
 #include "sim/system.hh"
-
+#include "sim/ckpt_collect.hh"
+#include <iostream>
+using namespace std;
 namespace gem5
 {
 
@@ -160,6 +162,9 @@ Process::Process(const ProcessParams &params, EmulationPageTable *pTable,
 
     if (loader::debugSymbolTable.empty())
         loader::debugSymbolTable = objFile->symtab();
+
+    init_ckpt_settings(params.ckptsetting.c_str());
+    cout <<params.ckptsetting<<endl;
 }
 
 void
