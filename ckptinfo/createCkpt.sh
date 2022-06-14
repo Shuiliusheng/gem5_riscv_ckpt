@@ -2,7 +2,7 @@
 
 if [[ $# < 2 ]]; then
     echo "parameters are not enough!"
-    echo "./run.sh bench ckptinst bench_option"
+    echo "./run.sh bench settings bench_option"
     exit
 fi
 
@@ -12,7 +12,7 @@ if [[ ! -e $bench ]]; then
     exit
 fi 
 
-ckptinsts=$2
+settings=$2
 options="--options=$3"
 
 basename=`echo $(basename $bench) |awk -F '.' '{print $1}'`
@@ -22,16 +22,12 @@ logfile="$basename.log"
 #stacktop=801017856  #0x2fbe9000
 #mmapend=789483520   #0x2f0e9000
 
-stacktop=270582939648  #0x3f00000000
-mmapend=261993005056   #0x3d00000000
+#stacktop=10000 #270582939648  #0x3f00000000
+#mmapend=10000 #261993005056   #0x3d00000000
 
-maxinsts=100000
-startinsts=10000
-endinsts=100000
-
-debugflags="ShowMemInfo,ShowRegInfo,ShowSyscall"
+debugflags="CreateCkpt"
 
 
-echo "build/RISCV/gem5.opt --debug-flag=$debugflags --debug-file=$logfile ./configs/example/se.py --stackbase=$stacktop --mmapend=$mmapend --ckptinsts=$ckptinsts -c $bench $options"
+echo "build/RISCV/gem5.opt --debug-flag=$debugflags --debug-file=$logfile ./configs/example/se.py -c $bench $options"
 
-build/RISCV/gem5.opt --debug-flag=$debugflags --debug-file=$logfile ./configs/example/se.py --maxinsts=$maxinsts --startinsts=$startinsts --endinsts=$endinsts --stackbase=$stacktop --mmapend=$mmapend --ckptinsts=$ckptinsts -c $bench "$options"
+build/RISCV/gem5.opt --debug-flag=$debugflags --debug-file=$logfile ./configs/example/se.py --mem-type=SimpleMemory --mem-size=8GB --ckptsetting=$settings -c $bench "$options"

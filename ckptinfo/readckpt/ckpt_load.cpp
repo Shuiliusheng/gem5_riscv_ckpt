@@ -61,7 +61,9 @@ void read_ckptinfo(char ckptinfo[])
     fseek(p, 16*temp+8, SEEK_SET);
 
     fread(&siminfo, sizeof(siminfo), 1, p);
-    printf("sim slice info, start: %ld, simNum: %ld, rawLength: %ld, exitpc: 0x%lx, cause: %ld\n", siminfo.start, siminfo.simNum, siminfo.exit_cause>>2, siminfo.exitpc, siminfo.exit_cause%4);
+    uint64_t warmup = siminfo.simNum >> 32;
+    siminfo.simNum = (siminfo.simNum << 32) >> 32;
+    printf("sim slice info, start: %ld, simNum: %ld, rawLength: %ld, warmup: %ld, exitpc: 0x%lx, cause: %ld\n", siminfo.start, siminfo.simNum, siminfo.exit_cause>>2, warmup, siminfo.exitpc, siminfo.exit_cause%4);
     runinfo->exitpc = siminfo.exitpc;
     runinfo->exit_cause = siminfo.exit_cause % 4;
     uint64_t runLength = siminfo.exit_cause >> 2;
@@ -168,10 +170,13 @@ void read_ckptinfo(char ckptinfo[])
     runinfo->lastinsts = __csrr_instret();
     runinfo->startcycles = __csrr_cycle();
     runinfo->startinsts = __csrr_instret();
-    if(runLength != 0)
-        init_start(runLength, runLength/10);
+    if(runLength != 0){
+        init_start(runLength, warmup);
+        printf("maxinst: %ld, warmup %%10\n", runLength);
+    }
     else {
-        init_start(siminfo.simNum, siminfo.simNum/10);
+        init_start(siminfo.simNum, siminfo.simNum/20);
+        printf("maxinst: %ld, warmup %%10\n", siminfo.simNum);
     }
     //step8: set the testing program's register information
     Load_fp_regs(StoreFpRegAddr);

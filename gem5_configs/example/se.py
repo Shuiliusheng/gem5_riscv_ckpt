@@ -111,6 +111,9 @@ def get_processes(args):
         if '--mmapend' in str(sys.argv):
             process.mmapend = args.mmapend
 
+        if '--ckptsetting' in str(sys.argv):
+            process.ckptsetting = args.ckptsetting
+
         multiprocesses.append(process)
         idx += 1
 

@@ -65,7 +65,9 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     fseek(p, 16*numinfos+8, SEEK_SET);
 
     fread(&siminfo, sizeof(siminfo), 1, p);
-    printf("siminfo, start: %ld, simNum: %ld, length: %ld, exitpc: 0x%lx, cause: %ld\n", siminfo.start, siminfo.simNum, siminfo.exit_cause>>2, siminfo.exitpc, siminfo.exit_cause%4);
+    uint64_t warmup = siminfo.simNum >> 32;
+    siminfo.simNum = (siminfo.simNum << 32) >> 32;
+    printf("sim slice info, start: %ld, simNum: %ld, rawLength: %ld, warmup: %ld, exitpc: 0x%lx, cause: %ld\n", siminfo.start, siminfo.simNum, siminfo.exit_cause>>2, warmup, siminfo.exitpc, siminfo.exit_cause%4);
    
     //step 1: read npc
     fread(&npc, 8, 1, p);
