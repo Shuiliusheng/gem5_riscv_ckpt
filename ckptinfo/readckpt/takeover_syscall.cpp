@@ -1,21 +1,12 @@
 #include "ckptinfo.h"
 
-typedef struct{
-    uint64_t pc;
-    uint64_t num;
-    uint64_t p0, p1, p2;
-    uint64_t hasret, ret;
-    uint64_t bufaddr, data_offset, data_size;
-}SyscallInfo;
-
 extern unsigned long long __takeOverSys_Addr;
-
 uint64_t takeOverAddr = (uint64_t)&__takeOverSys_Addr;
 
 void takeoverSyscall()
 {
     asm volatile("__takeOverSys_Addr: ");
-    Save_int_regs(StoreIntRegAddr);
+    Context_Operation("sd x", StoreIntRegAddr);
     Load_necessary(OldIntRegAddr);
     RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
 
@@ -27,7 +18,8 @@ void takeoverSyscall()
 
     uint64_t saddr = runinfo->syscall_info_addr;
     SyscallInfo *infos = (SyscallInfo *)(saddr+8+runinfo->nowcallnum * sizeof(SyscallInfo));
-    
+    runinfo->intregs[10] = infos->p0;
+
     if (runinfo->nowcallnum >= runinfo->totalcallnum){
         printf("syscall is overflow, exit.\n");
         printf("test program user running info, cycles: %ld, insts: %ld\n", runinfo->cycles, runinfo->insts);
@@ -74,20 +66,16 @@ void takeoverSyscall()
 
     runinfo->nowcallnum ++;
 
-    if(runinfo->nowcallnum == runinfo->totalcallnum && runinfo->exit_cause == Cause_ExitInst) {
+    if(runinfo->nowcallnum == runinfo->totalcallnum) {
         printf("--- exit the last syscall %d, and replace exit pc (0x%lx) with jmp ---\n", runinfo->nowcallnum, runinfo->exitpc);
-        *((uint16_t *)runinfo->exitpc) = (ECall_Replace)%65536;
-        *((uint16_t *)(runinfo->exitpc+2)) = (ECall_Replace) >> 16;
-	    asm volatile("fence.i  ");
+        *((uint32_t *)runinfo->exitpc) = runinfo->exitJmpInst;
+	    asm volatile("fence.i");
     }
 
-
-    uint64_t npc = infos->pc + 4;
-    WriteTemp(0, npc);
-
+    updateJmpInst(runinfo->sysJmpinfos[runinfo->nowcallnum]);
     runinfo->lastcycles = __csrr_cycle();
     runinfo->lastinsts = __csrr_instret();
 
-    Load_int_regs(StoreIntRegAddr);
-    JmpTemp(0);
+    Context_Operation("ld x", StoreIntRegAddr);
+    StartJump();
 }

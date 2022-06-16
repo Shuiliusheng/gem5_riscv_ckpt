@@ -20,7 +20,28 @@
 #define Cause_ExitSysCall 1
 #define Cause_ExitInst 2
 
-extern uint64_t takeOverAddr;
+typedef struct{
+    uint64_t addr;
+    uint32_t inst;
+}JmpInfo;
+
+typedef struct{
+    int num;
+    JmpInfo *infos;
+}JmpRepInfo;
+
+typedef struct{
+    uint64_t addr;
+    uint64_t size;
+}MemRangeInfo;
+
+typedef struct{
+    uint64_t pc;
+    uint64_t num;
+    uint64_t p0, p1, p2;
+    uint64_t hasret, ret;
+    uint64_t bufaddr, data_offset, data_size;
+}SyscallInfo;
 
 typedef struct{
     uint64_t exitpc;
@@ -37,25 +58,33 @@ typedef struct{
     uint64_t lastinsts;
     uint64_t startcycles;
     uint64_t startinsts;
+    uint32_t exitJmpInst;
+    JmpRepInfo *sysJmpinfos;
 }RunningInfo;
 
-typedef struct{
-    uint64_t addr;
-    uint64_t size;
-}MemRangeInfo;
-
-
-extern MemRangeInfo data_seg, text_seg;
-
 void takeoverSyscall();
+
 uint64_t loadelf(char * progname, char *ckptinfo);
-void read_ckptsyscall(char filename[]);
 void read_ckptinfo(char ckptinfo[]);
 
-//读写临时寄存器 + 跳转临时寄存器
-#define WriteRTemp(srcreg, rtempnum) "ori x0, " srcreg ", 8+" #rtempnum " \n\t"
-#define ReadRTemp(dstreg, rtempnum) "ori x0, " dstreg ", 4+" #rtempnum " \n\t"
-#define JmpRTemp(rtempnum) "ori x0, x0, 12+" #rtempnum " \n\t"
+bool setJmp(uint64_t instaddr, uint64_t base, uint64_t target);
+void initMidJmpPlace();
+void getRangeInfo(char filename[]);
+void produceJmpInst(uint64_t npc);
+void updateJmpInst(JmpRepInfo &info);
+
+
+extern uint64_t takeOverAddr;
+extern MemRangeInfo text_seg;
+
+
+#define TPoint1 0x100000
+#define TPoint2 0x1FF000
+#define MaxJALOffset 0xFFFF0
+
+#define StartJump() asm volatile( \
+    "jal x0, 0x100000  \n\t"   \
+); 
 
 #define Load_necessary(BaseAddr) asm volatile( \
     "li a0, " BaseAddr " \n\t"   \
@@ -65,172 +94,41 @@ void read_ckptinfo(char ckptinfo[]);
     "ld fp,8*8(a0)  \n\t"   \
 ); 
 
-#define JmpTemp(num) asm volatile( \
-    JmpRTemp(num)   \
-); 
-
-#define WriteTemp(num, val) asm volatile( \
-    "mv t0, %[data] \n\t"   \
-    WriteRTemp("t0", num) \
-    "fence \n\t"   \
-    : :[data]"r"(val)  \
-); 
-
-#define Save_int_regs(BaseAddr) asm volatile( \
-    WriteRTemp("a0", 2) \
-    "fence \n\t"   \
+#define Context_Operation(Op, BaseAddr) asm volatile( \
     "li a0, " BaseAddr " \n\t"   \
-    "sd x1,8*1(a0)  \n\t"   \
-    "sd x2,8*2(a0)  \n\t"   \
-    "sd x3,8*3(a0)  \n\t"   \
-    "sd x4,8*4(a0)  \n\t"   \
-    "sd x5,8*5(a0)  \n\t"   \
-    "sd x6,8*6(a0)  \n\t"   \
-    "sd x7,8*7(a0)  \n\t"   \
-    "sd x8,8*8(a0)  \n\t"   \
-    "sd x9,8*9(a0)  \n\t"   \
-    "sd x10,8*10(a0)  \n\t"   \
-    "sd x11,8*11(a0)  \n\t"   \
-    "sd x12,8*12(a0)  \n\t"   \
-    "sd x13,8*13(a0)  \n\t"   \
-    "sd x14,8*14(a0)  \n\t"   \
-    "sd x15,8*15(a0)  \n\t"   \
-    "sd x16,8*16(a0)  \n\t"   \
-    "sd x17,8*17(a0)  \n\t"   \
-    "sd x18,8*18(a0)  \n\t"   \
-    "sd x19,8*19(a0)  \n\t"   \
-    "sd x20,8*20(a0)  \n\t"   \
-    "sd x21,8*21(a0)  \n\t"   \
-    "sd x22,8*22(a0)  \n\t"   \
-    "sd x23,8*23(a0)  \n\t"   \
-    "sd x24,8*24(a0)  \n\t"   \
-    "sd x25,8*25(a0)  \n\t"   \
-    "sd x26,8*26(a0)  \n\t"   \
-    "sd x27,8*27(a0)  \n\t"   \
-    "sd x28,8*28(a0)  \n\t"   \
-    "sd x29,8*29(a0)  \n\t"   \
-    "sd x30,8*30(a0)  \n\t"   \
-    "sd x31,8*31(a0)  \n\t"   \
-    ReadRTemp("a1", 2) \
-    "fence  \n\t"   \
-    "sd a1,8*10(a0)  #store a0  \n\t"   \
-);  
-
-#define Load_int_regs(BaseAddr) asm volatile( \
-    "li a0, " BaseAddr " \n\t"   \
-    "ld x1,8*1(a0)  \n\t"   \
-    "ld x2,8*2(a0)  \n\t"   \
-    "ld x3,8*3(a0)  \n\t"   \
-    "ld x4,8*4(a0)  \n\t"   \
-    "ld x5,8*5(a0)  \n\t"   \
-    "ld x6,8*6(a0)  \n\t"   \
-    "ld x7,8*7(a0)  \n\t"   \
-    "ld x8,8*8(a0)  \n\t"   \
-    "ld x9,8*9(a0)  \n\t"   \
-    "ld x11,8*11(a0)  \n\t"   \
-    "ld x12,8*12(a0)  \n\t"   \
-    "ld x13,8*13(a0)  \n\t"   \
-    "ld x14,8*14(a0)  \n\t"   \
-    "ld x15,8*15(a0)  \n\t"   \
-    "ld x16,8*16(a0)  \n\t"   \
-    "ld x17,8*17(a0)  \n\t"   \
-    "ld x18,8*18(a0)  \n\t"   \
-    "ld x19,8*19(a0)  \n\t"   \
-    "ld x20,8*20(a0)  \n\t"   \
-    "ld x21,8*21(a0)  \n\t"   \
-    "ld x22,8*22(a0)  \n\t"   \
-    "ld x23,8*23(a0)  \n\t"   \
-    "ld x24,8*24(a0)  \n\t"   \
-    "ld x25,8*25(a0)  \n\t"   \
-    "ld x26,8*26(a0)  \n\t"   \
-    "ld x27,8*27(a0)  \n\t"   \
-    "ld x28,8*28(a0)  \n\t"   \
-    "ld x29,8*29(a0)  \n\t"   \
-    "ld x30,8*30(a0)  \n\t"   \
-    "ld x31,8*31(a0)  \n\t"   \
-    "ld a0,8*10(a0)  \n\t"   \
-); 
-
-
-#define Save_fp_regs(BaseAddr) asm volatile( \
-    WriteRTemp("a0", 2) \
-    "fence \n\t"   \
-    "li a0, " BaseAddr " \n\t"   \
-    "fsd f1,8*0(a0)  \n\t"   \
-    "fsd f1,8*1(a0)  \n\t"   \
-    "fsd f2,8*2(a0)  \n\t"   \
-    "fsd f3,8*3(a0)  \n\t"   \
-    "fsd f4,8*4(a0)  \n\t"   \
-    "fsd f5,8*5(a0)  \n\t"   \
-    "fsd f6,8*6(a0)  \n\t"   \
-    "fsd f7,8*7(a0)  \n\t"   \
-    "fsd f8,8*8(a0)  \n\t"   \
-    "fsd f9,8*9(a0)  \n\t"   \
-    "fsd f10,8*10(a0)  \n\t"   \
-    "fsd f11,8*11(a0)  \n\t"   \
-    "fsd f12,8*12(a0)  \n\t"   \
-    "fsd f13,8*13(a0)  \n\t"   \
-    "fsd f14,8*14(a0)  \n\t"   \
-    "fsd f15,8*15(a0)  \n\t"   \
-    "fsd f16,8*16(a0)  \n\t"   \
-    "fsd f17,8*17(a0)  \n\t"   \
-    "fsd f18,8*18(a0)  \n\t"   \
-    "fsd f19,8*19(a0)  \n\t"   \
-    "fsd f20,8*20(a0)  \n\t"   \
-    "fsd f21,8*21(a0)  \n\t"   \
-    "fsd f22,8*22(a0)  \n\t"   \
-    "fsd f23,8*23(a0)  \n\t"   \
-    "fsd f24,8*24(a0)  \n\t"   \
-    "fsd f25,8*25(a0)  \n\t"   \
-    "fsd f26,8*26(a0)  \n\t"   \
-    "fsd f27,8*27(a0)  \n\t"   \
-    "fsd f28,8*28(a0)  \n\t"   \
-    "fsd f29,8*29(a0)  \n\t"   \
-    "fsd f30,8*30(a0)  \n\t"   \
-    "fsd f31,8*31(a0)  \n\t"   \
-    ReadRTemp("a0", 2) \
-    "fence  \n\t"   \
-);  
-
-#define Load_fp_regs(BaseAddr) asm volatile( \
-    WriteRTemp("a0", 2) \
-    "fence \n\t"   \
-    "li a0, " BaseAddr " \n\t"   \
-    "fld f0,8*0(a0)  \n\t"   \
-    "fld f1,8*1(a0)  \n\t"   \
-    "fld f2,8*2(a0)  \n\t"   \
-    "fld f3,8*3(a0)  \n\t"   \
-    "fld f4,8*4(a0)  \n\t"   \
-    "fld f5,8*5(a0)  \n\t"   \
-    "fld f6,8*6(a0)  \n\t"   \
-    "fld f7,8*7(a0)  \n\t"   \
-    "fld f8,8*8(a0)  \n\t"   \
-    "fld f9,8*9(a0)  \n\t"   \
-    "fld f10,8*10(a0)  \n\t"   \
-    "fld f11,8*11(a0)  \n\t"   \
-    "fld f12,8*12(a0)  \n\t"   \
-    "fld f13,8*13(a0)  \n\t"   \
-    "fld f14,8*14(a0)  \n\t"   \
-    "fld f15,8*15(a0)  \n\t"   \
-    "fld f16,8*16(a0)  \n\t"   \
-    "fld f17,8*17(a0)  \n\t"   \
-    "fld f18,8*18(a0)  \n\t"   \
-    "fld f19,8*19(a0)  \n\t"   \
-    "fld f20,8*20(a0)  \n\t"   \
-    "fld f21,8*21(a0)  \n\t"   \
-    "fld f22,8*22(a0)  \n\t"   \
-    "fld f23,8*23(a0)  \n\t"   \
-    "fld f24,8*24(a0)  \n\t"   \
-    "fld f25,8*25(a0)  \n\t"   \
-    "fld f26,8*26(a0)  \n\t"   \
-    "fld f27,8*27(a0)  \n\t"   \
-    "fld f28,8*28(a0)  \n\t"   \
-    "fld f29,8*29(a0)  \n\t"   \
-    "fld f30,8*30(a0)  \n\t"   \
-    "fld f31,8*31(a0)  \n\t"   \
-    ReadRTemp("a0", 2) \
-    "fence  \n\t"   \
-); 
+    Op "0,8*0(a0)  \n\t"   \
+    Op "1,8*1(a0)  \n\t"   \
+    Op "2,8*2(a0)  \n\t"   \
+    Op "3,8*3(a0)  \n\t"   \
+    Op "4,8*4(a0)  \n\t"   \
+    Op "5,8*5(a0)  \n\t"   \
+    Op "6,8*6(a0)  \n\t"   \
+    Op "7,8*7(a0)  \n\t"   \
+    Op "8,8*8(a0)  \n\t"   \
+    Op "9,8*9(a0)  \n\t"   \
+    Op "11,8*11(a0)  \n\t"   \
+    Op "12,8*12(a0)  \n\t"   \
+    Op "13,8*13(a0)  \n\t"   \
+    Op "14,8*14(a0)  \n\t"   \
+    Op "15,8*15(a0)  \n\t"   \
+    Op "16,8*16(a0)  \n\t"   \
+    Op "17,8*17(a0)  \n\t"   \
+    Op "18,8*18(a0)  \n\t"   \
+    Op "19,8*19(a0)  \n\t"   \
+    Op "20,8*20(a0)  \n\t"   \
+    Op "21,8*21(a0)  \n\t"   \
+    Op "22,8*22(a0)  \n\t"   \
+    Op "23,8*23(a0)  \n\t"   \
+    Op "24,8*24(a0)  \n\t"   \
+    Op "25,8*25(a0)  \n\t"   \
+    Op "26,8*26(a0)  \n\t"   \
+    Op "27,8*27(a0)  \n\t"   \
+    Op "28,8*28(a0)  \n\t"   \
+    Op "29,8*29(a0)  \n\t"   \
+    Op "30,8*30(a0)  \n\t"   \
+    Op "31,8*31(a0)  \n\t"   \
+    Op "10,8*10(a0)  \n\t"   \
+);
 
 #define DEFINE_CSRR(s)                     \
     static inline uint64_t __csrr_##s()    \

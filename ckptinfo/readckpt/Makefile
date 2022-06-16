@@ -1,6 +1,6 @@
 
 
-CC = riscv64-unknown-linux-gnu-gcc 
+CC = riscv64-unknown-linux-gnu-g++ 
 OBJDUMP = riscv64-unknown-linux-gnu-objdump
 CFLAGS = -static -O2 #-DSHOWLOG 
 DIR_SRC = .
