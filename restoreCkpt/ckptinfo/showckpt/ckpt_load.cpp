@@ -2,9 +2,10 @@
 
 typedef struct{
     uint64_t addr;
-    uint64_t size;
+    // uint64_t size;
     uint64_t data;
 }LoadInfo;
+//默认均为8B
 
 typedef struct{
     uint64_t start;
@@ -99,6 +100,9 @@ void read_ckptinfo(char ckptinfo[])
     printf("--- first load num: %ld ---\n\n", loadnum);
     LoadInfo *linfos = (LoadInfo *)malloc(sizeof(LoadInfo)*loadnum);
     fread(&linfos[0], sizeof(LoadInfo), loadnum, p);
+    // for(int i=0;i<loadnum;i++){
+    //     printf("load %d: 0x%lx 0x%lx\n", i, linfos[i].addr,  linfos[i].data);
+    // }
     free(linfos);
     
     //step5: 加载syscall的执行信息到内存中

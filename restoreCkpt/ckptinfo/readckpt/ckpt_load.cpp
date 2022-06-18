@@ -3,9 +3,10 @@
 
 typedef struct{
     uint64_t addr;
-    uint64_t size;
     uint64_t data;
 }LoadInfo;
+//    uint64_t size;
+//first load默认是8B
 
 typedef struct{
     uint64_t start;
@@ -96,13 +97,8 @@ void setFistLoad(FILE *p)
     LoadInfo *linfos = (LoadInfo *)malloc(sizeof(LoadInfo)*loadnum);
     fread(&linfos[0], sizeof(LoadInfo), loadnum, p);
     for(int j=0;j<loadnum;j++){
-        // printf("load %d, addr: 0x%lx, size: %d, data: 0x%lx\n", j, linfos[j].addr, linfos[j].size, linfos[j].data);
-        switch(linfos[j].size) {
-            case 1: *((uint8_t *)linfos[j].addr) = (uint8_t)linfos[j].data; break;
-            case 2: *((uint16_t *)linfos[j].addr) = (uint16_t)linfos[j].data; break;
-            case 4: *((uint32_t *)linfos[j].addr) = (uint32_t)linfos[j].data; break;
-            case 8: *((uint64_t *)linfos[j].addr) = linfos[j].data; break;
-        }
+        // printf("load %d, addr: 0x%lx, data: 0x%lx\n", j, linfos[j].addr, linfos[j].data);
+        *((uint64_t *)linfos[j].addr) = linfos[j].data;
     }
     free(linfos);
 }

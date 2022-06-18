@@ -54,7 +54,7 @@
 3. 创建ckpt文件 (saveCkptInfo)
     - 将textAccess和preAccess转换为区域信息，以4KB为基础单位，将其分别划分为多个区域(textrange, memrange)
     - 将记录的以1B为单位的first load进行合并，将其合并为以8B为单位的load指令（没有则为0）
-    - 将ckpt基础信息和textrange, memrange, firstload, syscallinfo写入文件中
+    - 将ckpt基础信息和textrange, memrange, firstload(所有load的大小都为8B), syscallinfo写入文件中
     - 文件格式: prefix_ckpt_{startplace}.info
         | textinfo num              | 8      |
         |:-------------------------:|:------:|
@@ -69,7 +69,7 @@
         | memrange num              | 8      |
         | memrange info(addr, size) | num*16 |
         | first load num            | 8      |
-        | load (addr, size, data)   | num*24 |
+        | load (addr, data)         | num*16 |
         | **syscall info num**      |**8**   |
         | pc                        | 8      |
         | num                       | 8      |
