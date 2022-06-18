@@ -2,9 +2,10 @@
 
 typedef struct{
     uint64_t addr;
-    uint64_t size;
     uint64_t data;
 }LoadInfo;
+//uint64_t size;
+//first load is 8B
 
 typedef struct{
     uint64_t start;

@@ -28,10 +28,10 @@ typedef struct{
 
 typedef struct{
   uint64_t addr;
-  uint64_t size;
   uint8_t data[8];
 }FirstLoadInfo;
-
+//  uint64_t size;
+//first load size is 8B
 
 class SyscallInfo{
   public:
