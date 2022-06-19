@@ -37,7 +37,7 @@
 #include "base/trace.hh"
 #include "cpu/thread_context.hh"
 #include "sim/syscall_emul.hh"
-#include "debug/ShowSyscall.hh"
+#include "debug/CreateCkpt.hh"
 #include <stdio.h>
 #include "sim/ckpt_collect.hh"
 
@@ -90,13 +90,13 @@ EmuLinux::syscall(ThreadContext *tc)
     process->Process::syscall(tc);
 
     RegVal num = tc->readIntReg(RiscvISA::SyscallNumReg);
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) { 
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) { 
         RegVal a0 = tc->readIntReg(10);
         RegVal a1 = tc->readIntReg(11);
         RegVal a2 = tc->readIntReg(12);
         RegVal a3 = tc->readIntReg(13);
         RegVal a4 = tc->readIntReg(14);
-        // DPRINTF(ShowSyscall, "{\"type\":\"syscall enter\", \"pc\": \"0x%llx\", \"sysnum\": \"0x%x\", \"param\": [ \"0x%llx\", \"0x%llx\", \"0x%llx\", \"0x%llx\", \"0x%llx\" ]}\n", tc->pcState().pc(), num, a0, a1, a2, a3, a4);
+        // DPRINTF(CreateCkpt, "{\"type\":\"syscall enter\", \"pc\": \"0x%llx\", \"sysnum\": \"0x%x\", \"param\": [ \"0x%llx\", \"0x%llx\", \"0x%llx\", \"0x%llx\", \"0x%llx\" ]}\n", tc->pcState().pc(), num, a0, a1, a2, a3, a4);
         vector<uint64_t> params;
         params.push_back(a0);
         params.push_back(a1);
@@ -132,7 +132,7 @@ unameFunc64(SyscallDesc *desc, ThreadContext *tc, VPtr<Linux::utsname> name)
     strcpy(unametemp.version, "#1 Mon Aug 18 11:32:15 EDT 2003");
     strcpy(unametemp.machine, "riscv64");
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
         unsigned outsize = sizeof(Linux::utsname); 
         unsigned char *outdata = (unsigned char *)(&unametemp);
         unsigned long long dstaddr = tc->readIntReg(10);
@@ -143,7 +143,7 @@ unameFunc64(SyscallDesc *desc, ThreadContext *tc, VPtr<Linux::utsname> name)
         //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
         // }
 	    // sprintf(str, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-        // DPRINTF1(ShowSyscall, "%s\n", str);
+        // DPRINTF1(CreateCkpt, "%s\n", str);
         // printf("%s\n", str);
         // free(str);
 

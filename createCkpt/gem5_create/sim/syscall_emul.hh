@@ -107,7 +107,7 @@
 #include "sim/syscall_desc.hh"
 #include "sim/syscall_emul_buf.hh"
 #include "sim/syscall_return.hh"
-#include "debug/ShowSyscall.hh"
+#include "debug/CreateCkpt.hh"
 #include "sim/ckpt_collect.hh"
 
 #if defined(__APPLE__) && defined(__MACH__) && !defined(CMSG_ALIGN)
@@ -605,7 +605,7 @@ copyOutStat64Buf1(TgtStatPtr tgt, HostStatPtr host,
                  bool fakeTTY=false)
 {
     copyOutStatBuf1<OS>(tgt, host, fakeTTY);
-    // DPRINTF(ShowSyscall, "copyOutStat64Buf: 0x%lx, 0x%lx, size: %d\n", (unsigned long long)&tgt->st_dev, host, sizeof(host));
+    // DPRINTF(CreateCkpt, "copyOutStat64Buf: 0x%lx, 0x%lx, size: %d\n", (unsigned long long)&tgt->st_dev, host, sizeof(host));
 #if defined(STAT_HAVE_NSEC)
     tgt->st_atime_nsec = host->st_atime_nsec;
     tgt->st_mtime_nsec = host->st_mtime_nsec;
@@ -673,7 +673,7 @@ copyOutStat64Buf(TgtStatPtr tgt, HostStatPtr host,
                  bool fakeTTY=false)
 {
     copyOutStatBuf<OS>(tgt, host, fakeTTY);
-    // DPRINTF(ShowSyscall, "copyOutStat64Buf: 0x%lx, 0x%lx, size: %d\n", (unsigned long long)&tgt->st_dev, host, sizeof(host));
+    // DPRINTF(CreateCkpt, "copyOutStat64Buf: 0x%lx, 0x%lx, size: %d\n", (unsigned long long)&tgt->st_dev, host, sizeof(host));
 #if defined(STAT_HAVE_NSEC)
     constexpr ByteOrder bo = OS::byteOrder;
 
@@ -993,8 +993,8 @@ openatFunc(SyscallDesc *desc, ThreadContext *tc,
     DPRINTF_SYSCALL(Verbose, "%s: sim_fd[%d], target_fd[%d] -> path:%s\n"
                     "(inferred from:%s)\n", desc->name(),
                     sim_fd, tgt_fd, used_path.c_str(), path.c_str());
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) { 
-        // DPRINTF(ShowSyscall, "{\"type\":\"syscall info\", \"info\": \"open\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"filename\": \"%s\", \"flag\": \"0x%x\", \"mode\": \"0x%x\"}\n", tc->pcState().pc(), tgt_fd, path.c_str(), tgt_flags, mode);
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) { 
+        // DPRINTF(CreateCkpt, "{\"type\":\"syscall info\", \"info\": \"open\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"filename\": \"%s\", \"flag\": \"0x%x\", \"mode\": \"0x%x\"}\n", tc->pcState().pc(), tgt_fd, path.c_str(), tgt_flags, mode);
 
         ckpt_add_sysexe(tc->pcState().pc(), 0, 0, 0, NULL);
     }
@@ -1330,7 +1330,7 @@ stat64Func(SyscallDesc *desc, ThreadContext *tc,
         return -errno;
 
     copyOutStat64Buf<OS>(tgt_stat, &hostBuf);
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
         typename OS::tgt_stat64 temp_stat;
         copyOutStat64Buf1<OS>(&temp_stat, &hostBuf);
         unsigned outsize = sizeof(temp_stat); 
@@ -1342,7 +1342,7 @@ stat64Func(SyscallDesc *desc, ThreadContext *tc,
         // for(int i=0;i<outsize-1;i++){
         //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
         // }
-        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
@@ -1383,7 +1383,7 @@ fstatat64Func(SyscallDesc *desc, ThreadContext *tc,
 
     copyOutStat64Buf<OS>(tgt_stat, &hostBuf);
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
         typename OS::tgt_stat64 temp_stat;
         copyOutStat64Buf1<OS>(&temp_stat, &hostBuf);
         unsigned outsize = sizeof(temp_stat); 
@@ -1395,7 +1395,7 @@ fstatat64Func(SyscallDesc *desc, ThreadContext *tc,
         // for(int i=0;i<outsize-1;i++){
         //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
         // }
-        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
@@ -1431,7 +1431,7 @@ fstat64Func(SyscallDesc *desc, ThreadContext *tc,
 
     copyOutStat64Buf<OS>(tgt_stat, &hostBuf, (sim_fd == 1));
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
         typename OS::tgt_stat64 temp_stat;
         copyOutStat64Buf1<OS>(&temp_stat, &hostBuf, (sim_fd == 1));
         unsigned outsize = sizeof(temp_stat); 
@@ -1441,7 +1441,7 @@ fstat64Func(SyscallDesc *desc, ThreadContext *tc,
         // for(int i=0;i<outsize-1;i++){
         //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
         // }
-        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), 0, tc->readIntReg(11), outsize, outdata);
@@ -1505,7 +1505,7 @@ lstat64Func(SyscallDesc *desc, ThreadContext *tc,
 
     copyOutStat64Buf<OS>(tgt_stat, &hostBuf);
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
         typename OS::tgt_stat64 temp_stat;
         copyOutStat64Buf1<OS>(&temp_stat, &hostBuf);
         unsigned outsize = sizeof(temp_stat); 
@@ -1517,7 +1517,7 @@ lstat64Func(SyscallDesc *desc, ThreadContext *tc,
         // for(int i=0;i<outsize-1;i++){
         //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
         // }
-        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
@@ -1576,7 +1576,7 @@ statfsFunc(SyscallDesc *desc, ThreadContext *tc,
 
     copyOutStatfsBuf<OS>(tgt_stat, &hostBuf);
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
         typename OS::tgt_statfs temp_stat;
         copyOutStatfsBuf1<OS>(&temp_stat, &hostBuf);
         unsigned outsize = sizeof(temp_stat); 
@@ -1588,7 +1588,7 @@ statfsFunc(SyscallDesc *desc, ThreadContext *tc,
         // for(int i=0;i<outsize-1;i++){
         //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
         // }
-        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
@@ -1747,7 +1747,7 @@ fstatfsFunc(SyscallDesc *desc, ThreadContext *tc,
 
     copyOutStatfsBuf<OS>(tgt_stat, &hostBuf);
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
         typename OS::tgt_statfs temp_stat;
         copyOutStatfsBuf1<OS>(&temp_stat, &hostBuf);
         unsigned outsize = sizeof(temp_stat); 
@@ -1759,7 +1759,7 @@ fstatfsFunc(SyscallDesc *desc, ThreadContext *tc,
         // for(int i=0;i<outsize-1;i++){
         //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
         // }
-        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
@@ -2074,7 +2074,7 @@ getrlimitFunc(SyscallDesc *desc, ThreadContext *tc,
         break;
     }
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
         unsigned outsize = sizeof(rlp_temp); 
         unsigned char *outdata = (unsigned char *)(&rlp_temp);
         unsigned long long dstaddr = tc->readIntReg(11);
@@ -2084,7 +2084,7 @@ getrlimitFunc(SyscallDesc *desc, ThreadContext *tc,
         // for(int i=0;i<outsize-1;i++){
         //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
         // }
-        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
@@ -2128,7 +2128,7 @@ prlimitFunc(SyscallDesc *desc, ThreadContext *tc,
             break;
         }
 
-        if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+        if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
             unsigned outsize = sizeof(rlp_temp); 
             unsigned char *outdata = (unsigned char *)(&rlp_temp);
             unsigned long long dstaddr = tc->readIntReg(13);
@@ -2138,7 +2138,7 @@ prlimitFunc(SyscallDesc *desc, ThreadContext *tc,
             // for(int i=0;i<outsize-1;i++){
             //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
             // }
-            // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+            // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
             // free(str);
 
             ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
@@ -2158,7 +2158,7 @@ clock_gettimeFunc(SyscallDesc *desc, ThreadContext *tc,
     tp->tv_sec = htog(tp->tv_sec, OS::byteOrder);
     tp->tv_nsec = htog(tp->tv_nsec, OS::byteOrder);
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
         typename OS::timespec tp_temp;
         getElapsedTimeNano(tp_temp.tv_sec, tp_temp.tv_nsec);
         tp_temp.tv_sec += seconds_since_epoch;
@@ -2171,7 +2171,7 @@ clock_gettimeFunc(SyscallDesc *desc, ThreadContext *tc,
         // for(int i=0;i<outsize-1;i++){
         //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
         // }
-        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
@@ -2190,7 +2190,7 @@ clock_getresFunc(SyscallDesc *desc, ThreadContext *tc, int clk_id,
     tp->tv_sec = 0;
     tp->tv_nsec = 1;
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
         typename OS::timespec tp_temp;
         tp_temp.tv_nsec = 1;
         tp_temp.tv_sec = 0;
@@ -2203,7 +2203,7 @@ clock_getresFunc(SyscallDesc *desc, ThreadContext *tc, int clk_id,
         // for(int i=0;i<outsize-1;i++){
         //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
         // }
-        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
@@ -2223,7 +2223,7 @@ gettimeofdayFunc(SyscallDesc *desc, ThreadContext *tc,
     tp->tv_sec = htog(tp->tv_sec, OS::byteOrder);
     tp->tv_usec = htog(tp->tv_usec, OS::byteOrder);
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
         typename OS::timeval tp_temp;
         getElapsedTimeMicro(tp_temp.tv_sec, tp_temp.tv_usec);
         tp_temp.tv_sec += seconds_since_epoch;
@@ -2237,7 +2237,7 @@ gettimeofdayFunc(SyscallDesc *desc, ThreadContext *tc,
         // for(int i=0;i<outsize-1;i++){
         //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
         // }
-        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
@@ -2446,7 +2446,7 @@ timesFunc(SyscallDesc *desc, ThreadContext *tc, VPtr<typename OS::tms> bufp)
     bufp->tms_utime = htog(bufp->tms_utime, OS::byteOrder);
 
     
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
         unsigned outsize = sizeof(temp); 
         unsigned char *outdata = (unsigned char *)(&temp);
         unsigned long long dstaddr = tc->readIntReg(10);
@@ -2456,7 +2456,7 @@ timesFunc(SyscallDesc *desc, ThreadContext *tc, VPtr<typename OS::tms> bufp)
         // for(int i=0;i<outsize-1;i++){
         //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
         // }
-        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
@@ -2482,7 +2482,7 @@ timeFunc(SyscallDesc *desc, ThreadContext *tc, VPtr<> taddr)
         p.writeBlob(taddr, &t, (int)sizeof(typename OS::time_t));
     }
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) {
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
         unsigned outsize = sizeof(typename OS::time_t); 
         unsigned char *outdata = (unsigned char *)(&sec);
         unsigned long long dstaddr = tc->readIntReg(10);
@@ -2492,7 +2492,7 @@ timeFunc(SyscallDesc *desc, ThreadContext *tc, VPtr<> taddr)
         // for(int i=0;i<outsize-1;i++){
         //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
         // }
-        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
@@ -2779,14 +2779,14 @@ readFunc(SyscallDesc *desc, ThreadContext *tc,
 
     BufferArg buf_arg(buf_ptr, nbytes);
     int bytes_read = read(sim_fd, buf_arg.bufferPtr(), nbytes);
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) { 
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) { 
         // char *str = (char *)malloc(1000+nbytes*8);
         // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"read\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), tgt_fd, (unsigned long long)buf_ptr, nbytes, bytes_read);
         unsigned char *data1 = (unsigned char *)buf_arg.bufferPtr();
         // for(int i=0;i<nbytes-1;i++){
         //     sprintf(str, "%s\"0x%x\",", str, data1[i]);
         // }
-        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, data1[nbytes-1]);
+        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, data1[nbytes-1]);
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), bytes_read, (uint64_t)buf_ptr, nbytes, data1);
@@ -2830,14 +2830,14 @@ writeFunc(SyscallDesc *desc, ThreadContext *tc,
     }
 
     int bytes_written = write(sim_fd, buf_arg.bufferPtr(), nbytes);
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) { 
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) { 
         // char *str = (char *)malloc(1000+nbytes*8);
         // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"write\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), tgt_fd, (unsigned long long)buf_ptr, nbytes, bytes_written);
         unsigned char *data1 = (unsigned char *)buf_arg.bufferPtr();
         // for(int i=0;i<nbytes-1;i++){
         //     sprintf(str, "%s\"0x%x\",", str, data1[i]);
         // }
-        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, data1[nbytes-1]);
+        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, data1[nbytes-1]);
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), bytes_written, (uint64_t)buf_ptr, nbytes, data1);

@@ -54,6 +54,7 @@
 #include "sim/process_impl.hh"
 #include "sim/syscall_return.hh"
 #include "sim/system.hh"
+#include "sim/ckpt_collect.hh"
 
 namespace gem5
 {
@@ -74,17 +75,18 @@ RiscvProcess64::RiscvProcess64(const ProcessParams &params,
         RiscvProcess(params, objFile)
 {
     // const Addr stack_base = 0x7FFF FFFF FFFF FFFFL;
-    const Addr stack_base = params.stackbase;
+    Addr stack_base = params.stackbase;
+    if(ckptsettings.stack_base != 0) stack_base = ckptsettings.stack_base;
+
     const Addr max_stack_size = 8 * 1024 * 1024;
     const Addr next_thread_stack_base = stack_base - max_stack_size;
     const Addr brk_point = roundUp(image.maxAddr(), PageBytes);
     // const Addr mmap_end = 0x4000000000000000L;
-    const Addr mmap_end =  params.mmapend;
+    Addr mmap_end =  params.mmapend;
+    if(ckptsettings.mmapend != 0) mmap_end = ckptsettings.mmapend;
     printf("addr info, stack_base: 0x%lx, brk: 0x%lx, mmap_end: 0x%lx, next_thread_stack_base: 0x%lx\n", stack_base, brk_point, mmap_end, next_thread_stack_base);
     memState = std::make_shared<MemState>(this, brk_point, stack_base,
             max_stack_size, next_thread_stack_base, mmap_end);
-
-    // printf("args: 0x%lx, 0x%lx\n", params.stackbase, params.mmapend);
 }
 
 RiscvProcess32::RiscvProcess32(const ProcessParams &params,

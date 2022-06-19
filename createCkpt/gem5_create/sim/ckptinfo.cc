@@ -159,7 +159,7 @@ uint64_t CkptInfo::getRange(set<uint64_t> &addrs, vector<CodeRange> &ranges)
   return totalsize;
 }
 
-bool CkptInfo::detectOver(uint64_t exit_place, uint64_t exit_pc) 
+bool CkptInfo::detectOver(uint64_t exit_place, uint64_t exit_pc, uint64_t instinfo[]) 
 {
   bool isOver = false;
   if(exit_place >= this->startnum + this->length) {
@@ -169,6 +169,10 @@ bool CkptInfo::detectOver(uint64_t exit_place, uint64_t exit_pc)
   }
   if(!isOver) {
     return false;
+  }
+  //update inst infor
+  for(int i=0;i<10;i++){
+    this->instinfo[i] = instinfo[i] - this->instinfo[i];
   }
 
   //add syscall buffer addr information to all addresses
@@ -182,12 +186,10 @@ bool CkptInfo::detectOver(uint64_t exit_place, uint64_t exit_pc)
   this->getFistloads();
   this->textsize = this->getRange(this->textAccess, this->textrange);
   this->memsize = this->getRange(this->preAccess, this->memrange);
-  showCkptInfo();
-  showSysInfo();
-  
+
   saveDetailInfo();
   saveCkptInfo();
-  saveSysInfo();
+  // saveSysInfo();
   preAccess.clear();
   textAccess.clear();
   firstloads.clear();
@@ -199,80 +201,20 @@ bool CkptInfo::detectOver(uint64_t exit_place, uint64_t exit_pc)
 
 void CkptInfo::showCkptInfo() 
 {
-  DPRINTF(ShowSyscall, "{\"type\": \"ckptinfo\", \"startnum\": \"%ld\", \"exitnum\": \"%ld\", \"length\": \"%ld\", \"pc\": \"0x%lx\", \"npc\": \"0x%lx\", \"exitpc\": \"0x%lx\"}\n", startnum, simNums, length, pc, npc, exit_pc);
-
-  char str[3000];
-  sprintf(str, "{\"type\": \"int_regs\", \"data\": [ ");
-  for(int i=0;i<31;i++){
-      sprintf(str, "%s\"0x%lx\", ", str, intregs[i]);
-  }
-  DPRINTF(ShowSyscall, "%s\"0x%lx\" ]}\n", str, intregs[31]);
-
-  sprintf(str, "{\"type\": \"fp_regs\", \"data\": [ ");
-  for(int i=0;i<31;i++){
-      sprintf(str, "%s\"0x%lx\", ", str, fpregs[i]);
-  }
-  DPRINTF(ShowSyscall, "%s\"0x%lx\" ]}\n", str, fpregs[31]);
-
-  sprintf(str, "{\"type\": \"textRange\", \"addr\": [ ");
-  int size = textrange.size();
-  int i=0;
-  for(i=0;i<size-1;i++){
-      sprintf(str, "%s\"0x%lx\", ", str, textrange[i].addr);
-  }
-  sprintf(str, "%s\"0x%lx\" ], \"size\": [ ", str, textrange[size-1].addr);
-  for(i=0;i<size-1;i++){
-      sprintf(str, "%s\"0x%x\", ", str, textrange[i].size);
-  }
-  DPRINTF(ShowSyscall, "%s\"0x%x\" ] }\n", str, textrange[size-1].size);
-
-  sprintf(str, "{\"type\": \"memRange\", \"addr\": [ ");
-  size = memrange.size();
-  for(i=0;i<size-1;i++){
-      sprintf(str, "%s\"0x%lx\", ", str, memrange[i].addr);
-  }
-  sprintf(str, "%s\"0x%lx\" ], \"size\": [ ", str, memrange[size-1].addr);
-  for(i=0;i<size-1;i++){
-      sprintf(str, "%s\"0x%x\", ", str, memrange[i].size);
-  }
-  DPRINTF(ShowSyscall, "%s\"0x%x\" ] }\n", str, memrange[size-1].size);
-
-  for(int i=0;i<firstloads.size();i++) {
-    DPRINTF(ShowSyscall, "{\"type\": \"fld\", \"a\": \"0x%lx\", \"s\": \"0x%x\", \"d\": \"0x%lx\"}\n", firstloads[i].addr, firstloads[i].size, *((uint64_t *)firstloads[i].data));
-  }
-
-  printf("ckptinfo, startnum: %ld, exitnum: %ld, length: %ld, pc: 0x%lx, npc: 0x%lx, exitpc: 0x%lx\n", startnum, simNums, length, pc, npc, exit_pc);
-  printf("text range num: %ld, mem range num: %ld, first load num: %ld\n", textrange.size(), memrange.size(), firstloads.size());
+  
 }
 
 
 void CkptInfo::showSysInfo() 
 {
-  for(int i=0;i<sysinfos.size(); i++){
-    char str1[200];
-    sprintf(str1, "{\"type\": \"syscall\", \"pc\": \"0x%lx\", \"sysnum\": \"0x%x\", \"sysname\": \"%s\", \"hasret\": \"%d\", \"ret\": \"0x%lx\", \"params\":[\"0x%lx\", \"0x%lx\", \"0x%lx\"]", sysinfos[i].pc, sysinfos[i].num, sysinfos[i].name.c_str(), sysinfos[i].hasret, sysinfos[i].ret, sysinfos[i].params[0], sysinfos[i].params[1], sysinfos[i].params[2]);
-
-    if(sysinfos[i].data.size() > 0) {
-      char *str = (char *)malloc(1000 + sysinfos[i].data.size()*8);
-      sprintf(str, "%s, \"bufaddr\": \"0x%lx\", \"size\": \"0x%lx\", \"data\": [ ", str1, sysinfos[i].bufaddr, sysinfos[i].data.size());
-      int size = sysinfos[i].data.size()-1;
-      for(int j=0;j<size;j++){
-        sprintf(str, "%s\"0x%x\",", str, sysinfos[i].data[j]);
-      }
-      DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, sysinfos[i].data[size]);
-      free(str);
-    }
-    else {
-      DPRINTF(ShowSyscall, "%s, \"bufaddr\": \"0x%lx\", \"size\": \"0x%lx\", \"data\": []}\n ", str1, sysinfos[i].bufaddr, sysinfos[i].data.size());
-    }
-  }
+  
 }
 
 
 void CkptInfo::saveDetailInfo()
 {
   char dstname[300];
-  sprintf(dstname, "%s_infor_%ld.txt", this->filename, this->startnum);
+  sprintf(dstname, "%s_infor_%ld.txt", this->filename, this->startnum + this->warmup);
 
   FILE *p=NULL;
   p = fopen(dstname, "w");
@@ -280,8 +222,8 @@ void CkptInfo::saveDetailInfo()
     printf("cannot open %s for write\n", dstname);
   }
   
-  fprintf(p, "ckptinfo, startnum: %ld, exitnum: %ld, length: %ld\n pc: 0x%lx, npc: 0x%lx, exitpc: 0x%lx\n", startnum, simNums, length, pc, npc, exit_pc);
-  fprintf(p, "text range num: %ld, mem range num: %ld, first load num: %ld, syscallnum: %ld\n\n", textrange.size(), memrange.size(), firstloads.size(), sysinfos.size());
+  fprintf(p, "ckptinfo, startnum: %lld, exitnum: %lld, length: %lld\n, warmup: %lld, pc: 0x%lx, npc: 0x%lx, exitpc: 0x%lx\n", startnum, simNums, length-warmup, warmup, pc, npc, exit_pc);
+  fprintf(p, "text range num: %lld, mem range num: %lld, first load num: %lld, syscallnum: %lld\n\n", textrange.size(), memrange.size(), firstloads.size(), sysinfos.size());
   
   fprintf(p, "\n-- integer register value: --\n");
   for(int i=0;i<32;i++){
@@ -293,22 +235,27 @@ void CkptInfo::saveDetailInfo()
       fprintf(p, "reg %d: 0x%lx\n", i, fpregs[i]);
   }
 
-  fprintf(p, "\n-- text range information: %ld KB --\n", textsize >> 10);
+  fprintf(p, "\n-- text range information: %lld KB --\n", textsize >> 10);
   for(int i=0;i<textrange.size();i++){
-      fprintf(p, "text range %d: 0x%lx, %ld KB\n", i, textrange[i].addr, textrange[i].size >> 10);
+      fprintf(p, "text range %d: 0x%lx, %lld KB\n", i, textrange[i].addr, textrange[i].size >> 10);
   }
 
-  fprintf(p, "\n-- mem range information: %ld KB --\n", memsize >> 10);
+  fprintf(p, "\n-- mem range information: %lld KB --\n", memsize >> 10);
   for(int i=0;i<memrange.size();i++){
-      fprintf(p, "mem range %d: 0x%lx, %ld KB\n", i, memrange[i].addr, memrange[i].size >> 10);
+      fprintf(p, "mem range %d: 0x%lx, %lld KB\n", i, memrange[i].addr, memrange[i].size >> 10);
   }  
+
+  fprintf(p, "\n--running instruction information --\n");
+  fprintf(p, "isLoad: %lld, isStore: %lld, isAtomic: %lld\n", instinfo[0], instinfo[1], instinfo[2]); 
+  fprintf(p, "isControl: %lld, isCall: %lld, isReturn: %lld\n", instinfo[3], instinfo[4], instinfo[5]); 
+  fprintf(p, "isCondCtrl: %lld, isUncondCtrl: %lld, isIndirectCtrl: %lld\n", instinfo[6], instinfo[7], instinfo[8]); 
   fclose(p);
 }
 
 void CkptInfo::saveCkptInfo()
 {
   char dstname[300];
-  sprintf(dstname, "%s_ckpt_%ld.info", this->filename, this->startnum);
+  sprintf(dstname, "%s_ckpt_%ld.info", this->filename, this->startnum + this->warmup);
 
   FILE *p=NULL;
   p = fopen(dstname, "wb");
@@ -323,9 +270,9 @@ void CkptInfo::saveCkptInfo()
   //start information
   uint64_t mem[5];
   mem[0] = startnum;
-  mem[1] = simNums;
+  mem[1] = simNums + (warmup << 32);
   mem[2] = exit_pc;
-  mem[3] = 2;
+  mem[3] = 2 + ((length-warmup) << 2);
   mem[4] = npc;
   fwrite(&mem[0], sizeof(uint64_t), 5, p);
   fwrite(&intregs[0], sizeof(uint64_t), 32, p);
@@ -341,24 +288,18 @@ void CkptInfo::saveCkptInfo()
   fwrite(&temp, sizeof(uint64_t), 1, p);
   fwrite(&firstloads[0], sizeof(FirstLoadInfo), temp, p);
 
+  //save syscall information 
+  saveSysInfo(p);
   fclose(p);
 }
 
 
-void CkptInfo::saveSysInfo()
+void CkptInfo::saveSysInfo(FILE *p)
 {
-  char dstname[300];
-  sprintf(dstname, "%s_ckpt_syscall_%ld.info", this->filename, this->startnum);
-
-  FILE *p=NULL;
-  p = fopen(dstname, "wb");
-  if(p == NULL){
-    printf("cannot open %s for write\n", dstname);
-  }
-
   uint64_t data_addr = 10*8*sysinfos.size() + 8; 
   uint64_t invalid_addr = 0xffffffff; 
   uint64_t temp = sysinfos.size();
+
   fwrite(&temp, sizeof(uint64_t), 1, p);
   uint64_t mem[10];
   for(int i=0; i<temp; i++) {
@@ -382,5 +323,4 @@ void CkptInfo::saveSysInfo()
   for(int i=0; i<temp; i++) {
     fwrite(&sysinfos[i].data[0], 1, sysinfos[i].data.size(), p);
   }
-  fclose(p);
 }

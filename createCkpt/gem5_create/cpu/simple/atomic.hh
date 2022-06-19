@@ -47,7 +47,7 @@
 #include "params/AtomicSimpleCPU.hh"
 #include "sim/probe/probe.hh"
 #include "sim/ckpt_collect.hh"
-#include "debug/ShowRegInfo.hh"
+
 namespace gem5
 {
 
@@ -63,11 +63,47 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     uint64_t tempregs[32];
     uint64_t ckpt_startinsts, ckpt_endinsts;
 
-    bool startshow = false;
     bool needshowFirst = false;
     bool startlog = false;
 
     set<Addr> preinsts;
+
+    uint64_t instnums[10];
+
+    void recordinst(StaticInstPtr inst) {
+      if(inst->isLoad()) {
+        instnums[0]++;
+      }
+      else if(inst->isStore()) {
+        instnums[1]++;
+      }
+      
+      if(inst->isAtomic()) {
+        instnums[2]++;
+      }
+      
+      if(inst->isControl()) {
+        instnums[3]++;
+      }
+      
+      if(inst->isCall()) {
+        instnums[4]++;
+      }
+      
+      if(inst->isReturn()) {
+        instnums[5]++;
+      }
+      
+      if(inst->isCondCtrl()) {
+        instnums[6]++;
+      }
+      if(inst->isUncondCtrl()) {
+        instnums[7]++;
+      }
+      if(inst->isIndirectCtrl()) {
+        instnums[8]++;
+      }
+    }
 
   protected:
     EventFunctionWrapper tickEvent;

@@ -90,6 +90,8 @@ class StaticInst : public RefCounted, public StaticInstFlags
   public:
     using RegIdArrayPtr = RegId (StaticInst:: *)[];
 
+    bool isCompressed;
+
   private:
     /// See srcRegIdx().
     RegIdArrayPtr _srcRegIdxPtr = nullptr;

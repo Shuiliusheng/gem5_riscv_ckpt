@@ -54,7 +54,5 @@ if need_simple_base:
     SimObject('BaseSimpleCPU.py')
 
 DebugFlag('ShowDetail')
-DebugFlag('ShowMemInfo')
-DebugFlag('ShowRegInfo')
 DebugFlag('ShowAssembly')
 DebugFlag('ShowCMOVAssembly')

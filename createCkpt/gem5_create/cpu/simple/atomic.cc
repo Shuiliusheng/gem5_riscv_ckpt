@@ -49,9 +49,7 @@
 #include "debug/Drain.hh"
 #include "debug/ExecFaulting.hh"
 #include "debug/SimpleCPU.hh"
-#include "debug/ShowMemInfo.hh"
-#include "debug/ShowSyscall.hh"
-#include "debug/ShowDetail.hh"
+#include "debug/CreateCkpt.hh"
 #include "mem/packet.hh"
 #include "mem/packet_access.hh"
 #include "mem/physical.hh"
@@ -98,11 +96,14 @@ AtomicSimpleCPU::AtomicSimpleCPU(const AtomicSimpleCPUParams &p)
 
     if(ckpt_startinsts == 0){
         startlog = true;
-        ::gem5::debug::ShowSyscall.enable();
+        ::gem5::debug::CreateCkpt.enable();
     }
 
     printf("start ckpt: %ld, end ckpt: %ld, interval: %ld\n", p.ckpt_startinsts, p.ckpt_endinsts, p.ckptinsts);
 
+    for(int i=0;i<10;i++){
+        instnums[i] = 0;
+    }
 }
 
 
@@ -434,7 +435,7 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t *data, unsigned size,
                 assert(!locked);
                 locked = true;
             }
-            if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo) && startlog) { 
+            if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt) && startlog) { 
                 ckpt_addload(addr, data, size);
             }
             return fault;
@@ -465,7 +466,7 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
         // This must be a cache block cleaning request
         data = zero_array;
     }
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo) && startlog) { 
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt) && startlog) { 
         ckpt_addstore(addr, size);
     }
 
@@ -623,7 +624,7 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
         return NoFault;
     }
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo) && startlog) { 
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt) && startlog) { 
         ckpt_addload(addr, data, size);
     }
 
@@ -635,6 +636,11 @@ void
 AtomicSimpleCPU::tick()
 {
     DPRINTF(SimpleCPU, "Tick\n");
+
+    if(pendingCkpts.size() == 0 && ckptidx == ckptsettings.ctrls.size()){
+        printf("all ckpts are created.\n");
+        exit(0);
+    }
 
     // Change thread if multi-threaded
     swapActiveThread();
@@ -723,39 +729,47 @@ AtomicSimpleCPU::tick()
                     countInst();
                     ppCommit->notify(std::make_pair(thread, curStaticInst));
 
-                    if(ckpt_startinsts!=0 && t_info.numInst >= ckpt_startinsts && t_info.numInst <= ckpt_endinsts){
+                    if(hasValidCkpt()){
                         startlog = true;
-                        ::gem5::debug::ShowSyscall.enable();
+                        ::gem5::debug::CreateCkpt.enable();
                     }
 
-                    if(ckpt_endinsts!=0 && t_info.numInst > ckpt_endinsts){
+                    if(!hasValidCkpt()){
                         startlog = false;
-                        ::gem5::debug::ShowSyscall.disable();
+                        ::gem5::debug::CreateCkpt.disable();
                     }
 
-                    if (( (t_info.numInst-ckpt_startinsts) % ckptinsts == 0) && (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowRegInfo)) && startlog) {
-                        needshowFirst = true;
+                    if(startlog) {
+                        recordinst(curStaticInst);
+                    }
+
+                    uint64_t length = 0;
+                    if (isCkptStart(t_info.numInst, length)) {
                         uint64_t intregs[32], fpregs[32];
                         for(int i=0;i<32;i++){
                             intregs[i] = thread->readIntReg(i);
                             fpregs[i] = thread->readFloatReg(i);
                         }
-                        addCkpt(t_info.numInst, ckptinsts, intregs, fpregs, thread->pcState().pc(), thread->nextInstAddr());
+                        addCkpt(t_info.numInst, length, intregs, fpregs, thread->pcState().pc(), thread->nextInstAddr(), instnums);
 
-                        printf("create Ckpt, start with inst number: %ld\n", t_info.numInst);
+                        printf("create Ckpt, start with inst number: %ld, %ld\n", t_info.numInst, length);
                     }
 
-                    uint64_t nowpc = thread->pcState().pc();
-                    bool isInPre = preinsts.find(nowpc) != preinsts.end();
-                    bool isInPre1 = preinsts.find(nowpc+2) != preinsts.end(); //保证不是一条压缩指令的情况下, 下一条也不在
-                    if(!isInPre && needshowFirst && !isInPre1 && startlog){
-                        needshowFirst = false;
-                        printf("{\"type\": \"ckptExitInst\", \"inst_num\": \"%ld\", \"inst_pc\": \"0x%lx\"}\n", t_info.numInst, nowpc);
-                        ckpt_detectOver(t_info.numInst, nowpc);
-                    }    
-                    
-                    preinsts.insert(nowpc);
-
+                    if(startlog) {
+                        if(t_info.numInst >= pendingCkpts[0]->startnum + pendingCkpts[0]->length) {
+                            if(!curStaticInst->isCompressed) {
+                                uint64_t nowpc = thread->pcState().pc();
+                                bool isInPre = preinsts.find(nowpc) != preinsts.end();
+                                if(!isInPre){
+                                    printf("{\"type\": \"ckptExitInst\", \"inst_num\": \"%ld\", \"inst_pc\": \"0x%lx\"}\n", t_info.numInst, nowpc);
+                                    ckpt_detectOver(t_info.numInst, nowpc, instnums);
+                                } 
+                            }
+                        }
+                        if(!curStaticInst->isCompressed) {
+                            preinsts.insert(thread->pcState().pc());
+                        }
+                    }
                 } else if (traceData) {
                     traceFault();
                 }
