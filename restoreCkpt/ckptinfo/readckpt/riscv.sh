@@ -5,11 +5,8 @@ objdump=riscv64-unknown-linux-gnu-objdump
 flags="-static -O2"
 dflags=""
 target="readckpt.riscv"
-if [[ $# > 0 ]]; then
-    dflags="-DSHOWLOG"
-fi
 
-filelist="takeover_syscall.cpp ckpt_load.cpp elf_load.cpp readckpt.cpp"
+filelist=`find . -name "*.cpp" `
 echo ${cc} $filelist $flags $dflags -o ${target}
 ${cc} $filelist $flags $dflags -o ${target}
 

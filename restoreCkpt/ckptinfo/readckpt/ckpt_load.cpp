@@ -1,10 +1,12 @@
-#include "info.h"
+#include "ckptinfo.h"
+#include "ctrl.h"
 
 typedef struct{
     uint64_t addr;
-    uint64_t size;
     uint64_t data;
 }LoadInfo;
+//    uint64_t size;
+//first load默认是8B
 
 typedef struct{
     uint64_t start;
@@ -13,29 +15,19 @@ typedef struct{
     uint64_t exit_cause;
 }SimInfo;
 
-void read_ckptsyscall(char filename[])
+void read_ckptsyscall(FILE *fp)
 {
-    uint64_t filesize, allocsize, alloc_vaddr;
-    FILE *fp=NULL;
-    fp = fopen(filename,"rb");
-    if(fp == NULL) {
-        printf("cannot open %s to read\n", filename);
-        exit(1);
-    }
-    
+    uint64_t filesize, allocsize, alloc_vaddr, nowplace;
+
+    nowplace = ftell(fp);
     fseek(fp, 0, SEEK_END);
-    filesize = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
+    filesize = ftell(fp) - nowplace;
+    fseek(fp, nowplace, SEEK_SET);
 
     allocsize = filesize + (4096-filesize%4096);
     alloc_vaddr = (uint64_t)mmap((void *)0x2000000, allocsize, PROT_READ | PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, 0);    
-
-    printf("ckptsyscall file alloc_vaddr: 0x%lx\n", alloc_vaddr);
     
-    if (fread((void *)alloc_vaddr, filesize, 1, fp) != 1) {
-        printf("cannot read file: %s\n", filename);
-        exit(1);
-    }
+    fread((void *)alloc_vaddr, filesize, 1, fp);
     fclose(fp);
 
     RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
@@ -43,14 +35,76 @@ void read_ckptsyscall(char filename[])
     runinfo->nowcallnum = 0;
     runinfo->totalcallnum = *((uint64_t *)alloc_vaddr);
 
-    printf("--- step 5, read syscall information and map them to memory, totalcallnum: %d ---\n", runinfo->totalcallnum);
-    if(ShowLog)
-        printf("syscallnum: %ld, alloc_mem: (0x%lx 0x%lx)\n", runinfo->totalcallnum, alloc_vaddr,  alloc_vaddr + allocsize);
+    printf("--- step 5, read syscall infor and map to memory, totalcallnum: %d ---\n", runinfo->totalcallnum);
+
+    //将ecall指令替换为jmp rtemp
+    for(int i=0; i<runinfo->totalcallnum; i++) {
+        SyscallInfo *sinfos = (SyscallInfo *)(runinfo->syscall_info_addr + 8 + i*sizeof(SyscallInfo));
+        *((uint32_t *)sinfos->pc) = ECall_Replace;
+    }
+}
+
+void alloc_memrange(FILE *p)
+{
+    MemRangeInfo memrange, extra;
+    uint64_t mrange_num=0;
+    fread(&mrange_num, 8, 1, p);
+    printf("--- step 3, read memory range information and do map, range num: %d ---\n", mrange_num);
+    uint64_t tsaddr = text_seg.addr, teaddr = text_seg.addr + text_seg.size;
+    for(int i=0;i<mrange_num;i++){
+        fread(&memrange, sizeof(MemRangeInfo), 1, p);
+        extra.size = 0;
+        extra.addr = 0;
+        uint64_t msaddr = memrange.addr, meaddr = memrange.addr + memrange.size;
+        //delete the range that covered by text segment
+        if(msaddr < tsaddr && meaddr > tsaddr) {
+            memrange.size = tsaddr - msaddr;
+            if(meaddr > teaddr) {
+                extra.addr = teaddr;
+                extra.size = meaddr - teaddr;
+            }
+        }
+        else if(msaddr >= tsaddr && msaddr <= teaddr) {
+            if(meaddr <= teaddr) 
+                memrange.size = 0;
+            else{
+                memrange.addr = teaddr;
+                memrange.size = meaddr - teaddr;
+            }
+        }
+
+        if(memrange.size !=0){
+            int* arr = static_cast<int*>(mmap((void *)memrange.addr, memrange.size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, 0, 0));
+            if(memrange.addr != (uint64_t)arr)
+                printf("map range: (0x%lx, 0x%lx), mapped addr: 0x%lx\n", memrange.addr, memrange.addr + memrange.size, arr);
+            assert(memrange.addr == (uint64_t)arr);  
+        }
+
+        if(extra.size !=0){
+            int* arr1 = static_cast<int*>(mmap((void *)extra.addr, extra.size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, 0, 0));
+            if(extra.addr != (uint64_t)arr1)
+                printf("map range: (0x%lx, 0x%lx), mapped addr: 0x%lx\n", extra.addr, extra.addr + extra.size, arr1);
+            assert(extra.addr == (uint64_t)arr1); 
+        }
+    }
+}
+
+void setFistLoad(FILE *p)
+{
+    uint64_t loadnum = 0;
+    fread(&loadnum, 8, 1, p);
+    printf("--- step 4, read first load infor and init them, first load num: %d ---\n", loadnum);
+    LoadInfo *linfos = (LoadInfo *)malloc(sizeof(LoadInfo)*loadnum);
+    fread(&linfos[0], sizeof(LoadInfo), loadnum, p);
+    for(int j=0;j<loadnum;j++){
+        // printf("load %d, addr: 0x%lx, data: 0x%lx\n", j, linfos[j].addr, linfos[j].data);
+        *((uint64_t *)linfos[j].addr) = linfos[j].data;
+    }
+    free(linfos);
 }
 
 
-
-void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
+void read_ckptinfo(char ckptinfo[])
 {
     uint64_t npc, mrange_num=0, loadnum = 0, temp=0;
     MemRangeInfo memrange, extra;
@@ -72,9 +126,14 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     fseek(p, 16*temp+8, SEEK_SET);
 
     fread(&siminfo, sizeof(siminfo), 1, p);
-    printf("siminfo, start: %d, simNum: %d, exitpc: 0x%lx, cause: %d\n", siminfo.start, siminfo.simNum, siminfo.exitpc, siminfo.exit_cause);
+    uint64_t warmup = siminfo.simNum >> 32;
+    uint64_t runLength = siminfo.exit_cause >> 2;
+    siminfo.simNum = (siminfo.simNum << 32) >> 32;
+    runinfo->exit_cause = siminfo.exit_cause % 4;
     runinfo->exitpc = siminfo.exitpc;
-    runinfo->exit_cause = siminfo.exit_cause;
+
+    printf("sim slice info, start: %ld, simNum: %ld, rawLength: %ld, warmup: %ld, exitpc: 0x%lx, cause: %ld\n", siminfo.start, siminfo.simNum, runLength, warmup, siminfo.exitpc, runinfo->exit_cause);
+    
 
     //step 1: read npc
     fread(&npc, 8, 1, p);
@@ -87,80 +146,18 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     printf("--- step 2, read integer and float registers ---\n");
 
     //step 3: read memory range information and map these ranges
-    fread(&mrange_num, 8, 1, p);
-    printf("--- step 3, read memory range information and do map, range num: %d ---\n", mrange_num);
-    MemRangeInfo *minfos = (MemRangeInfo *)malloc(sizeof(MemRangeInfo)*mrange_num);
-    fread(&minfos[0], sizeof(MemRangeInfo), mrange_num, p);
-    for(int i=0;i<mrange_num;i++){
-        printf("load range: %d\r", i);
-        memrange = minfos[i];
-        extra.size = 0;
-        extra.addr = 0;
-        uint64_t msaddr = memrange.addr, meaddr = memrange.addr + memrange.size;
-        uint64_t tsaddr = text_seg.addr, teaddr = text_seg.addr + text_seg.size;
-        //delete the range that covered by text segment
-        if(msaddr < tsaddr && meaddr > tsaddr) {
-            memrange.size = tsaddr - msaddr;
-            if(meaddr > teaddr) {
-                extra.addr = teaddr;
-                extra.size = meaddr - teaddr;
-            }
-        }
-        else if(msaddr >= tsaddr && msaddr <= teaddr) {
-            if(meaddr <= teaddr) {
-                memrange.size = 0;
-            }
-            else{
-                memrange.addr = teaddr;
-                memrange.size = meaddr - teaddr;
-            }
-        }
-
-        if(memrange.size !=0){
-            if(memrange.addr < 0xfffffffff){ // a small limit
-                int* arr = static_cast<int*>(mmap((void *)memrange.addr, memrange.size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, 0, 0));
-                if(memrange.addr != (uint64_t)arr)
-                    printf("map range: (0x%lx, 0x%lx), mapped addr: 0x%lx\n", memrange.addr, memrange.addr + memrange.size, arr);
-                assert(memrange.addr == (uint64_t)arr);  
-            }
-        }
-
-        if(extra.size !=0){
-            int* arr1 = static_cast<int*>(mmap((void *)extra.addr, extra.size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, 0, 0));
-            if(ShowLog)
-                printf("map range: (0x%lx, 0x%lx), mapped addr: 0x%lx\n", extra.addr, extra.addr + extra.size, arr1);
-            assert(extra.addr == (uint64_t)arr1); 
-        }
-    }
+    alloc_memrange(p);
 
     //step 4: read first load information, and store these data to memory
-    fread(&loadnum, 8, 1, p);
-    printf("--- step 4, read first load information and init these loads, load num: %d ---\n", loadnum);
-    LoadInfo *linfos = (LoadInfo *)malloc(sizeof(LoadInfo)*loadnum);
-    printf("--- step 4.1, malloc over, start read data\n");
-    fread(&linfos[0], sizeof(LoadInfo), loadnum, p);
-    for(int j=0;j<loadnum;j++){
-	    //if(j%100==0){
-		   // printf("load %d\r", j);
-	    //}
-	    switch(linfos[j].size) {
-	        case 1: *((uint8_t *)linfos[j].addr) = (uint8_t)linfos[j].data; break;
-            case 2: *((uint16_t *)linfos[j].addr) = (uint16_t)linfos[j].data; break;
-	        case 4: *((uint32_t *)linfos[j].addr) = (uint32_t)linfos[j].data; break;
-	        case 8: *((uint64_t *)linfos[j].addr) = linfos[j].data; break;
-        }
-    }
-    fclose(p);
-    free(linfos);
+    setFistLoad(p);
     
     //step5: 加载syscall的执行信息到内存中
-    read_ckptsyscall(ckpt_sysinfo);
+    read_ckptsyscall(p);
 
     //try to replace exit inst if syscall totalnum == 0
     if(runinfo->totalcallnum == 0 && runinfo->exit_cause == Cause_ExitInst) {
         printf("--- step 5.1, syscall is zero, replace exitinst with jmp rtemp ---\n");
-        *((uint16_t *)runinfo->exitpc) = (ECall_Replace)%65536;
-        *((uint16_t *)(runinfo->exitpc+2)) = (ECall_Replace) >> 16;
+        *((uint32_t *)runinfo->exitpc) = (ECall_Replace);
     }
 
     cycles[1] = __csrr_cycle();
@@ -169,13 +166,12 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
 
     //step6: init npc and takeover_syscall addr to temp register
     printf("--- step 6, init npc to rtemp(5) and takeover_syscall addr to rtemp(6) ---\n");
-    WriteTemp("0", npc);
-    uint64_t takeover_addr = ShowLog ? TakeOverAddrTrue : TakeOverAddrFalse;
-    WriteTemp("1", takeover_addr);
+    WriteTemp(0, npc);
+    WriteTemp(1, takeOverAddr);
 
     //step7: save registers data of boot program 
     printf("--- step 789, save registers data of boot program, set testing program registers, start testing ---\n");
-    Save_int_regs(OldIntRegAddr);
+    Context_Operation("sd x", OldIntRegAddr);
 
     runinfo->cycles = 0;
     runinfo->insts = 0;
@@ -183,10 +179,20 @@ void read_ckptinfo(char ckptinfo[], char ckpt_sysinfo[])
     runinfo->lastinsts = __csrr_instret();
     runinfo->startcycles = __csrr_cycle();
     runinfo->startinsts = __csrr_instret();
-
+    if(runLength != 0){
+        printf("maxinst: %ld, warmup %ld\n", runLength, warmup);
+        init_start(runLength, warmup);
+    }
+    else {
+        warmup = siminfo.simNum/20;
+        runLength = siminfo.simNum - warmup;
+        printf("maxinst: %ld, warmup %ld\n", runLength, warmup);
+        init_start(runLength, warmup);
+    }
     //step8: set the testing program's register information
-    Load_regs(StoreIntRegAddr);
+    Context_Operation("fld f", StoreFpRegAddr);
+    Context_Operation("ld x", StoreIntRegAddr);
 
     //step9: start the testing program
-    JmpTemp("0");
+    JmpRTemp(0); //WriteTemp(0, npc);
 }
