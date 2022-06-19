@@ -53,9 +53,239 @@
 using namespace std;
 
 typedef struct{
-  unsigned long long addr;
+  uint64_t addr;
   unsigned int size;
 }CodeRange;
+
+typedef struct{
+  uint64_t addr;
+  uint8_t data[8];
+  uint8_t first;
+  unsigned char size;
+}LoadInfo;
+
+
+class CkptInfo{
+public:
+  uint64_t startnum, simNums, length, exit_pc, pc, npc;
+  uint64_t intregs[32], fpregs[32];
+  vector<LoadInfo> loads;
+  vector<LoadInfo> firstloads;
+  vector<CodeRange> memrange;
+  vector<CodeRange> textrange;
+  set<uint64_t> preAccess;
+  set<uint64_t> textAccess;
+
+  CkptInfo(uint64_t startnum, uint64_t length, uint64_t intregs[], uint64_t fpregs[], uint64_t pc, uint64_t npc){
+    this->startnum = startnum;
+    for(int i=0;i<32;i++){
+      this->intregs[i] = intregs[i];
+      this->fpregs[i] = fpregs[i];
+    }
+    this->loads.clear();
+    this->firstloads.clear();
+    this->memrange.clear();
+    this->textrange.clear();
+    this->preAccess.clear();
+    this->textAccess.clear();
+    this->length = length;
+    this->pc = pc;
+    this->npc = npc;
+    DPRINTF(ShowRegInfo, "{\"type\": \"startckpt\", \"startnum\": \"%ld\"}\n", startnum);
+
+  }
+  ~CkptInfo(){
+    this->loads.clear();
+    this->preAccess.clear();
+    this->textAccess.clear();
+    this->firstloads.clear();
+    this->memrange.clear();
+    this->textrange.clear();
+  }
+
+public:
+  void addload(uint64_t addr, uint8_t *data, unsigned char size) {
+    uint8_t isFirst = 0;
+    uint64_t ta = addr + size - 1;
+    LoadInfo info;
+    for(int i=size-1; i>=0; i--,ta--) {
+      isFirst = isFirst << 1;
+      if(this->preAccess.find(ta) == this->preAccess.end()) {
+        isFirst = isFirst + 1;
+        info.data[i] = data[i];
+      }
+      this->preAccess.insert(ta);
+    }
+
+    if(isFirst != 0) {
+      info.first = isFirst;
+      info.addr = addr;
+      info.size = size;
+      this->loads.push_back(info);
+    }
+  }
+
+  void addstore(uint64_t addr, unsigned char size) {
+    for(int i=0; i<size; i++,addr++){
+      this->preAccess.insert(addr);
+    }
+  }
+
+  void addinst(uint64_t addr) {
+    for(int i=0; i<4; i++,addr++){
+      this->textAccess.insert(addr);
+    }
+  }
+
+  static bool cmp(LoadInfo &info1, LoadInfo &info2) {
+    return info1.addr < info2.addr;
+  }
+
+  void combine_loads(vector<LoadInfo> &temploads) {
+    int size = temploads.size();
+    if(size == 0) return ;
+
+    sort(temploads.begin(), temploads.end(), this->cmp);
+    long long len = 0;
+    LoadInfo info;
+    info.size = 8;
+    info.addr = temploads[0].addr;
+    *(uint64_t *)(info.data) = 0;
+    info.data[0] = temploads[0].data[0];
+
+    for(int i=1;i<size;i++){
+      len = temploads[i].addr - info.addr;
+      if(len < 8) {
+        info.data[len] = temploads[i].data[0];
+      }
+      else{
+        this->firstloads.push_back(info);
+        info.addr = temploads[i].addr;
+        *(uint64_t *)(info.data) = 0;
+        info.data[0] = temploads[i].data[0];
+      }
+    }
+    this->firstloads.push_back(info);
+  }
+
+  void getFistloads() {
+    vector<LoadInfo> temploads;
+    uint8_t isFirst = 0;
+    LoadInfo info;
+    info.size = 1;
+    for(int i=0;i<this->loads.size();i++){
+      isFirst = this->loads[i].first;
+      for(int j=0; j<this->loads[i].size; j++){
+        if(isFirst%2 == 1){
+          info.addr = this->loads[i].addr + j;
+          info.data[0] = this->loads[i].data[j];
+          temploads.push_back(info);
+        }
+        isFirst = isFirst >> 1;
+      }
+    }
+    this->loads.clear();
+    combine_loads(temploads);
+  }
+
+  void getRange(set<uint64_t> &addrs, vector<CodeRange> &ranges) {
+    set<uint64_t>::iterator iter = addrs.begin();
+    uint64_t eaddr = 0;
+    int64_t len = 0;
+    CodeRange r;
+    r.addr = ((*iter) >> 12) << 12;
+    r.size = 4096;
+    eaddr = r.addr + r.size;
+
+    for(iter = addrs.begin() ; iter != addrs.end() ; ++iter) {
+      len = *iter - eaddr;
+      if(len < 0) continue;
+      if(len < 4096) {
+        r.size += 4096;
+        eaddr = r.addr + r.size;
+      }
+      else{
+        ranges.push_back(r);
+        r.addr = ((*iter) >> 12) << 12;
+        r.size = 4096;
+        eaddr = r.addr + r.size;
+      }
+    }
+    ranges.push_back(r);
+  }
+
+  bool detectOver(uint64_t exit_place, uint64_t exit_pc) {
+    bool isOver = false;
+    if(exit_place >= this->startnum + this->length) {
+      isOver = true;
+      this->exit_pc = exit_pc;
+      this->simNums = exit_place - this->startnum;
+    }
+    if(!isOver) {
+      return false;
+    }
+
+    this->getFistloads();
+    this->getRange(this->preAccess, this->memrange);
+    this->getRange(this->textAccess, this->textrange);
+    saveCkptInfo();
+    return isOver;
+  }
+
+  void saveCkptInfo() {
+    DPRINTF(ShowRegInfo, "{\"type\": \"ckptinfo\", \"startnum\": \"%ld\", \"exitnum\": \"%ld\", \"length\": \"%ld\", \"pc\": \"0x%lx\", \"npc\": \"0x%lx\", \"exitpc\": \"0x%lx\"", startnum, simNums, length, pc, npc, exit_pc);
+
+    char str[3000];
+    sprintf(str, "{\"type\": \"int_regs\", \"data\": [ ");
+    for(int i=0;i<31;i++){
+        sprintf(str, "%s\"0x%lx\", ", str, intregs[i]);
+    }
+    DPRINTF(ShowRegInfo, "%s\"0x%lx\" ]}\n", str, intregs[31]);
+
+    sprintf(str, "{\"type\": \"fp_regs\", \"data\": [ ");
+    for(int i=0;i<31;i++){
+        sprintf(str, "%s\"0x%lx\", ", str, fpregs[i]);
+    }
+    DPRINTF(ShowRegInfo, "%s\"0x%lx\" ]}\n", str, fpregs[31]);
+
+    sprintf(str, "{\"type\": \"textRange\", \"addr\": [ ");
+    int size = textrange.size();
+    int i=0;
+    for(i=0;i<size-1;i++){
+        sprintf(str, "%s\"0x%lx\", ", str, textrange[i].addr);
+    }
+    sprintf(str, "%s\"0x%lx\" ], \"size\": [ ", str, textrange[size-1].addr);
+    for(i=0;i<size-1;i++){
+        sprintf(str, "%s\"0x%lx\", ", str, textrange[i].size);
+    }
+    DPRINTF(ShowRegInfo, "%s\"0x%lx\" ] }\n", str, textrange[size-1].size);
+
+    sprintf(str, "{\"type\": \"memRange\", \"addr\": [ ");
+    size = memrange.size();
+    for(i=0;i<size-1;i++){
+        sprintf(str, "%s\"0x%lx\", ", str, memrange[i].addr);
+    }
+    sprintf(str, "%s\"0x%lx\" ], \"size\": [ ", str, memrange[size-1].addr);
+    for(i=0;i<size-1;i++){
+        sprintf(str, "%s\"0x%x\", ", str, memrange[i].size);
+    }
+    DPRINTF(ShowRegInfo, "%s\"0x%x\" ] }\n", str, memrange[size-1].size);
+
+    for(int i=0;i<firstloads.size();i++) {
+      DPRINTF(ShowRegInfo, "{\"type\": \"fld\", \"a\": \"0x%lx\", \"s\": \"0x%x\", \"d\": \"0x%lx\"}\n", firstloads[i].addr, firstloads[i].size, *((uint64_t *)firstloads[i].data));
+    }
+
+    printf("ckptinfo, startnum: %ld, exitnum: %ld, length: %ld, pc: 0x%lx, npc: 0x%lx, exitpc: 0x%lx\n", startnum, simNums, length, pc, npc, exit_pc);
+    printf("text range num: %ld, mem range num: %ld, first load num: %ld\n", textrange.size(), memrange.size(), firstloads.size());
+
+    preAccess.clear();
+    textAccess.clear();
+    firstloads.clear();
+    memrange.clear();
+    textrange.clear();
+  }
+};
+
 
 
 namespace gem5
@@ -70,86 +300,49 @@ class AtomicSimpleCPU : public BaseSimpleCPU
 
     void init() override;
 
-    unsigned long long tempregs[32];
-    unsigned long long ckpt_startinsts, ckpt_endinsts;
+    uint64_t tempregs[32];
+    uint64_t ckpt_startinsts, ckpt_endinsts;
 
     bool startshow = false;
     bool needshowFirst = false;
     bool startlog = false;
 
+    vector<CkptInfo *> pendingCkpts;
+    void addCkpt(uint64_t startnum, uint64_t length, uint64_t intregs[], uint64_t fpregs[], uint64_t pc, uint64_t npc) {
+      pendingCkpts.push_back(new CkptInfo(startnum, length, intregs, fpregs, pc, npc));
+    }
+
+    void addload(uint64_t addr, uint8_t *data, unsigned char size) {
+      for(int i=0;i<pendingCkpts.size();i++){
+        pendingCkpts[i]->addload(addr, data, size);
+      }
+    } 
+
+    void addstore(uint64_t addr, unsigned char size) {
+      for(int i=0;i<pendingCkpts.size();i++){
+        pendingCkpts[i]->addstore(addr, size);
+      }
+    } 
+
+    void addinst(uint64_t addr) {
+      for(int i=0;i<pendingCkpts.size();i++){
+        pendingCkpts[i]->addinst(addr);
+      }
+    } 
+
+    void detectOver(uint64_t exit_place, uint64_t exit_pc) {
+      for (vector<CkptInfo *>::iterator it = pendingCkpts.begin(); it != pendingCkpts.end();) {
+        if ((*it)->detectOver(exit_place, exit_pc)) {
+          delete *it;
+          it = pendingCkpts.erase(it);
+        } else {
+          ++it;
+        }
+      }
+    }
+
 
     set<Addr> preinsts;
-    set<Addr> exeinsts;
-
-    set<Addr> preloads;
-    set<Addr> prestores;
-
-    void showCodeRange(){
-      vector<Addr> insts;
-      set<Addr>::iterator iter;
-      set<Addr> temp;
-      for(iter = exeinsts.begin() ; iter != exeinsts.end() ; ++iter) {
-        for(int i=0;i<4;i++){
-          temp.insert((*iter)+i);
-        }
-      }
-      for(iter = temp.begin() ; iter != temp.end() ; ++iter) {
-        insts.push_back(*iter);
-      }
-      unsigned int page = 4096;
-      int i=0, j=0;
-      vector<CodeRange> range1;
-      for(i=0;i<insts.size();i++){
-        unsigned long long start = insts[i] - (insts[i]%4096);
-        unsigned long long end = start + page;
-        for(j=i+1;j<insts.size();j++){
-          if(insts[j] >= end){
-            break;
-          }
-        }
-        CodeRange r;
-        r.addr = start;
-        r.size = page;
-        // printf("raw range: (0x%lx, 0x%lx, 0x%lx)\n", r.addr, r.addr+r.size, r.size);
-        range1.push_back(r);
-        i = j-1;
-      }
-
-      vector<CodeRange> range2;
-      for(i=0;i<range1.size();i++){
-        for(j=i+1;j<range1.size();j++){
-          if(range1[j].addr - range1[i].addr != (j-i)*page){
-            break;
-          }
-        }
-        CodeRange r;
-        r.addr = range1[i].addr;
-        r.size = (j-i)*page;
-        range2.push_back(r);
-        i = j - 1;
-      }
-
-      char str[3000];
-      sprintf(str, "{\"type\": \"textRange\", \"addr\": [ ");
-      for(i=0;i<range2.size()-1;i++){
-          sprintf(str, "%s\"0x%llx\", ", str, range2[i].addr);
-      }
-      sprintf(str, "%s\"0x%llx\" ], \"size\": [ ", str, range2[range2.size()-1].addr);
-
-      for(i=0;i<range2.size()-1;i++){
-          sprintf(str, "%s\"0x%llx\", ", str, range2[i].size);
-      }
-      DPRINTF(ShowRegInfo, "%s\"0x%llx\" ] }\n", str, range2[range2.size()-1].size);
-
-      for(i=0;i<range2.size();i++){
-        printf("range %d: (0x%lx, 0x%lx, 0x%lx)\n", i, range2[i].addr, range2[i].addr+range2[i].size, range2[i].size);
-      }
-
-      range2.clear();
-      range1.clear();
-      temp.clear();
-      insts.clear();
-    }
 
   protected:
     EventFunctionWrapper tickEvent;

@@ -50,7 +50,6 @@
 #include "debug/ExecFaulting.hh"
 #include "debug/SimpleCPU.hh"
 #include "debug/ShowMemInfo.hh"
-#include "debug/ShowRegInfo.hh"
 #include "debug/ShowSyscall.hh"
 #include "debug/ShowDetail.hh"
 #include "mem/packet.hh"
@@ -102,7 +101,7 @@ AtomicSimpleCPU::AtomicSimpleCPU(const AtomicSimpleCPUParams &p)
         ::gem5::debug::ShowSyscall.enable();
     }
 
-    printf("start ckpt: %d, end ckpt: %d\n", p.ckpt_startinsts, p.ckpt_endinsts);
+    printf("start ckpt: %d, end ckpt: %d, interval: %d\n", p.ckpt_startinsts, p.ckpt_endinsts, p.ckptinsts);
 
 }
 
@@ -436,36 +435,7 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t *data, unsigned size,
                 locked = true;
             }
             if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo) && startlog) { 
-                unsigned long long res = 0;
-                switch(size){
-                    case 1: res = data[0]; break;
-                    case 2: res = data[0] + ((unsigned long long)data[1] << 8); break;
-                    case 4: res = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24); break;
-                    case 8: res = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24) + ((unsigned long long)data[4] <<32) + ((unsigned long long)data[5] << 40) + ((unsigned long long)data[6] << 48) + ((unsigned long long)data[7] << 56); break;
-                }
-                bool needlog = false;
-                int i=0;
-                unsigned long long ta;
-                for(i=0; i<size; i++){
-                    ta = addr + i;
-                    if(prestores.find(ta) == prestores.end()){ //没找到前面有store，则退出循环
-                        needlog = true; //此时认为该load有可能是first load，因为没有被store完全覆盖
-                        break;
-                    }
-                }
-                if(needlog){ //此时继续判断是否为first load
-                    needlog = false;
-                    for(i=0; i<size; i++){
-                        ta = addr + i;
-                        if(preloads.find(ta) == preloads.end()){ //没找到前面有load到该地址，则退出循环
-                            needlog = true; //此时认为该load是first load，因此之前的load并没有完全覆盖它
-                            preloads.insert(ta); //将本身的地址记录下来
-                        }
-                    }
-                }
-                if(needlog){
-                    DPRINTF(ShowMemInfo, "{\"type\": \"mem_read\", \"addr\": \"0x%llx\", \"size\": \"0x%x\", \"data\": \"0x%llx\"}\n", addr, size, res);
-                }
+                addload(addr, data, size);
             }
             return fault;
         }
@@ -496,26 +466,7 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
         data = zero_array;
     }
     if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo) && startlog) { 
-        unsigned long long res1 = 0;
-        switch(size){
-            case 1: res1 = data[0]; break;
-            case 2: res1 = data[0] + ((unsigned long long)data[1] << 8); break;
-            case 4: res1 = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24); break;
-            case 8: res1 = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24) + ((unsigned long long)data[4] <<32) + ((unsigned long long)data[5] << 40) + ((unsigned long long)data[6] << 48) + ((unsigned long long)data[7] << 56); break;
-        }
-
-        bool needlog = false;
-        int i=0;
-        unsigned long long ta;
-        for(i=0; i<size; i++){
-            ta = addr + i;
-            if(prestores.find(ta) == prestores.end()){  
-                needlog = true; //即发现前面没有完全store了该地址
-                prestores.insert(ta);
-            }
-        }
-        if(needlog)
-            DPRINTF(ShowMemInfo, "{\"type\": \"mem_write\", \"addr\": \"0x%llx\", \"size\": \"0x%x\"}\n", addr, size);
+        addstore(addr, size);
     }
 
     // use the CPU's statically allocated write request and packet objects
@@ -673,37 +624,7 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
     }
 
     if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowMemInfo) && startlog) { 
-        unsigned long long res1 = 0;
-        switch(size){
-            case 1: res1 = data[0]; break;
-            case 2: res1 = data[0] + ((unsigned long long)data[1] << 8); break;
-            case 4: res1 = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24); break;
-            case 8: res1 = data[0] + ((unsigned long long)data[1] << 8) + ((unsigned long long)data[2] << 16) + ((unsigned long long)data[3] << 24) + ((unsigned long long)data[4] <<32) + ((unsigned long long)data[5] << 40) + ((unsigned long long)data[6] << 48) + ((unsigned long long)data[7] << 56); break;
-        }
-
-        bool needlog = false;
-        int i=0;
-        unsigned long long ta;
-        for(i=0; i<size; i++){
-            ta = addr + i;
-            if(prestores.find(ta) == prestores.end()){ //没找到前面有store，则退出循环
-                needlog = true; //此时认为该atomic有可能是first load，因为没有被store完全覆盖
-                break;
-            }
-        }
-        if(needlog){ //此时继续判断是否为first load
-            needlog = false;
-            for(i=0; i<size; i++){
-                ta = addr + i;
-                if(preloads.find(ta) == preloads.end()){ //没找到前面有load到该地址，则退出循环
-                    needlog = true; //此时认为该atomic是first load，因此之前的load并没有完全覆盖它
-                    preloads.insert(ta); //将本身的地址记录下来
-                }
-            }
-        }
-        if(needlog){
-            DPRINTF(ShowMemInfo, "{\"type\": \"mem_atomic\", \"addr\": \"0x%llx\", \"size\": \"0x%x\", \"data\": \"0x%llx\"}\n", addr, size, res1);
-        }
+        addload(addr, data, size);
     }
 
     //If there's a fault and we're not doing prefetch, return it
@@ -781,48 +702,18 @@ AtomicSimpleCPU::tick()
                 //}
             }
 
-            exeinsts.insert(thread->pcState().pc());
+            addinst(thread->pcState().pc());
 
             preExecute();
 
             Tick stall_ticks = 0;
             if (curStaticInst) {       
-                if((GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowDetail))){
-                    DPRINTF(ShowDetail, "--------------- pc: 0x%lx --------------- %d \n", thread->pcState().pc(), t_info.numInst);
-                    for(int i=0;i<curStaticInst->numSrcRegs();i++){
-                        RegId src = curStaticInst->srcRegIdx(i);
-                        DPRINTF(ShowDetail, "pc: 0x%lx, src %d: 0x%lx\n", thread->pcState().pc(), src.index(), thread->readIntReg(src.index()));
-                    }
-                    if(curStaticInst->isSyscall() || (t_info.numInst%500 == 0)) {
-                        DPRINTF(ShowDetail, "before syscall, int regs: \n");
-                        for(int i=0;i<31;i++){
-                            DPRINTF(ShowDetail, "r%d: 0x%lx\n", i, thread->readIntReg(i));
-                        }
-                    }
-                }
-
                 if(curStaticInst->isSyscall()){
                     preinsts.clear();
-                    if(startlog)
-                        DPRINTF(ShowRegInfo, "{\"type\": \"isSyscall\", \"inst_num\": \"%d\", \"pc\": \"0x%lx\"}\n", t_info.numInst, thread->pcState().pc());
-                    if(thread->readIntReg(17) == 0x5e && ckpt_endinsts == 0 && params().max_insts_any_thread == 0){
-                        showCodeRange();
-                    }
                 }
 
                 if(t_info.numInst % 1000000 == 0){
-                    printf("-----pc: 0x%lx -- simInsts: %d \n", thread->pcState().pc(), t_info.numInst);
-                }
-
-
-                if(ckpt_endinsts!=0 && t_info.numInst == ckpt_endinsts){
-                    showCodeRange();
-                    exeinsts.clear();
-                }
-
-                if(ckpt_endinsts == 0 && params().max_insts_any_thread != 0 && t_info.numInst+10 == params().max_insts_any_thread){
-                    showCodeRange();
-                    exeinsts.clear();
+                    printf("-----pc: 0x%lx -- simInsts: %ld \n", thread->pcState().pc(), t_info.numInst);
                 }
 
                 fault = curStaticInst->execute(&t_info, traceData);
@@ -831,18 +722,6 @@ AtomicSimpleCPU::tick()
                 if (fault == NoFault) {
                     countInst();
                     ppCommit->notify(std::make_pair(thread, curStaticInst));
-                    if((GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowDetail)) && startshow){
-                        for(int i=0;i<curStaticInst->numDestRegs();i++){
-                            RegId dst = curStaticInst->destRegIdx(i);
-                            DPRINTF(ShowDetail, "pc: 0x%lx, dst %d: 0x%lx\n", thread->pcState().pc(), dst.index(), thread->readIntReg(dst.index()));
-                        }
-                        if(curStaticInst->isSyscall()) {
-                            DPRINTF(ShowDetail, "after syscall, int regs: \n");
-                            for(int i=0;i<31;i++){
-                                DPRINTF(ShowDetail, "r%d: 0x%lx\n", i, thread->readIntReg(i));
-                            }
-                        }
-                    }
 
                     if(ckpt_startinsts!=0 && t_info.numInst >= ckpt_startinsts && t_info.numInst <= ckpt_endinsts){
                         startlog = true;
@@ -856,37 +735,26 @@ AtomicSimpleCPU::tick()
 
                     if (( (t_info.numInst-ckpt_startinsts) % ckptinsts == 0) && (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowRegInfo)) && startlog) {
                         needshowFirst = true;
-                        char str[3000];
-                        sprintf(str, "{\"type\": \"int_regs\", \"inst_num\": \"%d\", \"inst_pc\": \"0x%llx\", \"npc\": \"0x%llx\", \"data\": [ ", t_info.numInst, thread->pcState().pc(), thread->nextInstAddr());
-                        for(int i=0;i<31;i++){
-                            sprintf(str, "%s\"0x%llx\", ", str, thread->readIntReg(i));
+                        uint64_t intregs[32], fpregs[32];
+                        for(int i=0;i<32;i++){
+                            intregs[i] = thread->readIntReg(i);
+                            fpregs[i] = thread->readFloatReg(i);
                         }
-                        DPRINTF(ShowRegInfo, "%s\"0x%llx\" ]}\n", str, thread->readIntReg(31));
+                        addCkpt(t_info.numInst, ckptinsts, intregs, fpregs, thread->pcState().pc(), thread->nextInstAddr());
 
-                        sprintf(str, "{\"type\": \"fp_regs\", \"inst_num\": \"%d\", \"inst_pc\": \"0x%llx\", \"npc\": \"0x%llx\", \"data\": [ ", t_info.numInst, thread->pcState().pc(), thread->nextInstAddr());
-                        for(int i=0;i<31;i++){
-                            sprintf(str, "%s\"0x%llx\", ", str, thread->readFloatReg(i));
-                        }
-                        DPRINTF(ShowRegInfo, "%s\"0x%llx\" ]}\n", str, thread->readFloatReg(31));
-                        
-                        preloads.clear();
-                        prestores.clear();
                         printf("create Ckpt, start with inst number: %ld\n", t_info.numInst);
-
-                        // printf("ckpt place, exe number: %ld\n", exeinsts.size());
-                        // showCodeRange();
-                        // for(iter = exeinsts.begin() ; iter != exeinsts.end() ; ++iter) {
-                        //     printf("pc: 0x%lx\n", *iter);
-                        // }
-                        // exeinsts.clear();
                     }
-                    bool isInPre = preinsts.find(thread->pcState().pc()) != preinsts.end();
-                    bool isInPre1 = preinsts.find(thread->pcState().pc()+2) != preinsts.end(); //保证不是一条压缩指令的情况下, 下一条也不在
+
+                    uint64_t nowpc = thread->pcState().pc();
+                    bool isInPre = preinsts.find(nowpc) != preinsts.end();
+                    bool isInPre1 = preinsts.find(nowpc+2) != preinsts.end(); //保证不是一条压缩指令的情况下, 下一条也不在
                     if(!isInPre && needshowFirst && !isInPre1 && startlog){
-                        DPRINTF(ShowRegInfo, "{\"type\": \"ckptExitInst\", \"inst_num\": \"%d\", \"inst_pc\": \"0x%lx\"}\n", t_info.numInst, thread->pcState().pc());
                         needshowFirst = false;
+                        printf("{\"type\": \"ckptExitInst\", \"inst_num\": \"%ld\", \"inst_pc\": \"0x%lx\"}\n", t_info.numInst, nowpc);
+                        detectOver(t_info.numInst, nowpc);
                     }    
-                    preinsts.insert(thread->pcState().pc());
+                    
+                    preinsts.insert(nowpc);
 
                 } else if (traceData) {
                     traceFault();
