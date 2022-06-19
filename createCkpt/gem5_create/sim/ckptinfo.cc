@@ -87,7 +87,7 @@ void CkptInfo::combine_loads(vector<LoadInfo> &temploads)
   sort(temploads.begin(), temploads.end(), this->cmp);
   long long len = 0;
   FirstLoadInfo info;
-  info.size = 8;
+  // info.size = 8;
   info.addr = temploads[0].addr;
   *(uint64_t *)(info.data) = 0;
   info.data[0] = temploads[0].data[0];
@@ -98,7 +98,8 @@ void CkptInfo::combine_loads(vector<LoadInfo> &temploads)
       info.data[len] = temploads[i].data[0];
     }
     else{
-      this->firstloads.push_back(info);
+      if(*(uint64_t *)(info.data) != 0)
+        this->firstloads.push_back(info);
       info.addr = temploads[i].addr;
       *(uint64_t *)(info.data) = 0;
       info.data[0] = temploads[i].data[0];

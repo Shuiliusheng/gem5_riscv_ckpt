@@ -116,6 +116,7 @@ def addNoISAOptions(parser):
     parser.add_argument("--ckptinsts", type=int, default=10000)
     parser.add_argument("--stackbase", type=int, default=0x7FFFFFFF)
     parser.add_argument("--mmapend", type=int, default=0x41000000)
+    parser.add_argument("--ckptsetting", default="", help="The File for Setting Ckpt Create.")
 
     parser.add_argument("--startinsts", action="store", type=int, default=None)
     parser.add_argument("--endinsts", action="store", type=int, default=None)
