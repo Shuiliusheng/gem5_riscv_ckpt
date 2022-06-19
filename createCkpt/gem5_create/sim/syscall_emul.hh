@@ -108,6 +108,7 @@
 #include "sim/syscall_emul_buf.hh"
 #include "sim/syscall_return.hh"
 #include "debug/ShowSyscall.hh"
+#include "sim/ckpt_collect.hh"
 
 #if defined(__APPLE__) && defined(__MACH__) && !defined(CMSG_ALIGN)
 #define CMSG_ALIGN(len) (((len) + sizeof(size_t) - 1) & ~(sizeof(size_t) - 1))
@@ -993,7 +994,9 @@ openatFunc(SyscallDesc *desc, ThreadContext *tc,
                     "(inferred from:%s)\n", desc->name(),
                     sim_fd, tgt_fd, used_path.c_str(), path.c_str());
     if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) { 
-        DPRINTF(ShowSyscall, "{\"type\":\"syscall info\", \"info\": \"open\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"filename\": \"%s\", \"flag\": \"0x%x\", \"mode\": \"0x%x\"}\n", tc->pcState().pc(), tgt_fd, path.c_str(), tgt_flags, mode);
+        // DPRINTF(ShowSyscall, "{\"type\":\"syscall info\", \"info\": \"open\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"filename\": \"%s\", \"flag\": \"0x%x\", \"mode\": \"0x%x\"}\n", tc->pcState().pc(), tgt_fd, path.c_str(), tgt_flags, mode);
+
+        ckpt_add_sysexe(tc->pcState().pc(), 0, 0, 0, NULL);
     }
     return tgt_fd;
 }
@@ -1334,13 +1337,15 @@ stat64Func(SyscallDesc *desc, ThreadContext *tc,
         unsigned char *outdata = (unsigned char *)(&temp_stat);
         unsigned long long dstaddr = tc->readIntReg(11);
         unsigned long long res = result;
-        char *str = (char *)malloc(1000 + outsize*8); //
-        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
-        for(int i=0;i<outsize-1;i++){
-            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
-        }
-        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-        free(str);
+        // char *str = (char *)malloc(1000 + outsize*8); //
+        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        // for(int i=0;i<outsize-1;i++){
+        //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        // }
+        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // free(str);
+
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
     }
 
     return 0;
@@ -1385,13 +1390,15 @@ fstatat64Func(SyscallDesc *desc, ThreadContext *tc,
         unsigned char *outdata = (unsigned char *)(&temp_stat);
         unsigned long long dstaddr = tc->readIntReg(12);
         unsigned long long res = result;
-        char *str = (char *)malloc(1000 + outsize*8); //
-        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
-        for(int i=0;i<outsize-1;i++){
-            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
-        }
-        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-        free(str);
+        // char *str = (char *)malloc(1000 + outsize*8); //
+        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        // for(int i=0;i<outsize-1;i++){
+        //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        // }
+        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // free(str);
+
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
     }
 
     return 0;
@@ -1429,13 +1436,15 @@ fstat64Func(SyscallDesc *desc, ThreadContext *tc,
         copyOutStat64Buf1<OS>(&temp_stat, &hostBuf, (sim_fd == 1));
         unsigned outsize = sizeof(temp_stat); 
         unsigned char *outdata = (unsigned char *)(&temp_stat);
-        char *str = (char *)malloc(1000 + outsize*8);
-        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), tc->readIntReg(11), outsize, 0);
-        for(int i=0;i<outsize-1;i++){
-            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
-        }
-        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-        free(str);
+        // char *str = (char *)malloc(1000 + outsize*8);
+        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), tc->readIntReg(11), outsize, 0);
+        // for(int i=0;i<outsize-1;i++){
+        //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        // }
+        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // free(str);
+
+        ckpt_add_sysexe(tc->pcState().pc(), 0, tc->readIntReg(11), outsize, outdata);
     }
 
     return 0;
@@ -1503,13 +1512,15 @@ lstat64Func(SyscallDesc *desc, ThreadContext *tc,
         unsigned char *outdata = (unsigned char *)(&temp_stat);
         unsigned long long dstaddr = tc->readIntReg(11);
         unsigned long long res = result;
-        char *str = (char *)malloc(1000 + outsize*8); //
-        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
-        for(int i=0;i<outsize-1;i++){
-            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
-        }
-        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-        free(str);
+        // char *str = (char *)malloc(1000 + outsize*8); //
+        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        // for(int i=0;i<outsize-1;i++){
+        //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        // }
+        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // free(str);
+
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
     }
 
     return 0;
@@ -1572,13 +1583,15 @@ statfsFunc(SyscallDesc *desc, ThreadContext *tc,
         unsigned char *outdata = (unsigned char *)(&temp_stat);
         unsigned long long dstaddr = tc->readIntReg(11);
         unsigned long long res = 0;
-        char *str = (char *)malloc(1000 + outsize*8); //
-        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
-        for(int i=0;i<outsize-1;i++){
-            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
-        }
-        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-        free(str);
+        // char *str = (char *)malloc(1000 + outsize*8); //
+        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        // for(int i=0;i<outsize-1;i++){
+        //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        // }
+        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // free(str);
+
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
     }
 
     return 0;
@@ -1741,13 +1754,15 @@ fstatfsFunc(SyscallDesc *desc, ThreadContext *tc,
         unsigned char *outdata = (unsigned char *)(&temp_stat);
         unsigned long long dstaddr = tc->readIntReg(11);
         unsigned long long res = 0;
-        char *str = (char *)malloc(1000 + outsize*8); //
-        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
-        for(int i=0;i<outsize-1;i++){
-            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
-        }
-        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-        free(str);
+        // char *str = (char *)malloc(1000 + outsize*8); //
+        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        // for(int i=0;i<outsize-1;i++){
+        //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        // }
+        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // free(str);
+
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
     }
 
     return 0;
@@ -2064,13 +2079,15 @@ getrlimitFunc(SyscallDesc *desc, ThreadContext *tc,
         unsigned char *outdata = (unsigned char *)(&rlp_temp);
         unsigned long long dstaddr = tc->readIntReg(11);
         unsigned long long res = 0;
-        char *str = (char *)malloc(1000 + outsize*8); //
-        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
-        for(int i=0;i<outsize-1;i++){
-            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
-        }
-        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-        free(str);
+        // char *str = (char *)malloc(1000 + outsize*8); //
+        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        // for(int i=0;i<outsize-1;i++){
+        //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        // }
+        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // free(str);
+
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
     }
 
     return 0;
@@ -2116,13 +2133,15 @@ prlimitFunc(SyscallDesc *desc, ThreadContext *tc,
             unsigned char *outdata = (unsigned char *)(&rlp_temp);
             unsigned long long dstaddr = tc->readIntReg(13);
             unsigned long long res = 0;
-            char *str = (char *)malloc(1000 + outsize*8); //
-            sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
-            for(int i=0;i<outsize-1;i++){
-                sprintf(str, "%s\"0x%x\",", str, outdata[i]);
-            }
-            DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-            free(str);
+            // char *str = (char *)malloc(1000 + outsize*8); //
+            // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+            // for(int i=0;i<outsize-1;i++){
+            //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+            // }
+            // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+            // free(str);
+
+            ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
         }
     }
     return 0;
@@ -2147,13 +2166,15 @@ clock_gettimeFunc(SyscallDesc *desc, ThreadContext *tc,
         unsigned char *outdata = (unsigned char *)(&tp_temp);
         unsigned long long dstaddr = tc->readIntReg(11);
         unsigned long long res = 0;
-        char *str = (char *)malloc(1000 + outsize*8); //
-        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
-        for(int i=0;i<outsize-1;i++){
-            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
-        }
-        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-        free(str);
+        // char *str = (char *)malloc(1000 + outsize*8); //
+        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        // for(int i=0;i<outsize-1;i++){
+        //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        // }
+        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // free(str);
+
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
     }
 
     return 0;
@@ -2177,13 +2198,15 @@ clock_getresFunc(SyscallDesc *desc, ThreadContext *tc, int clk_id,
         unsigned char *outdata = (unsigned char *)(&tp_temp);
         unsigned long long dstaddr = tc->readIntReg(11);
         unsigned long long res = 0;
-        char *str = (char *)malloc(1000 + outsize*8); //
-        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
-        for(int i=0;i<outsize-1;i++){
-            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
-        }
-        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-        free(str);
+        // char *str = (char *)malloc(1000 + outsize*8); //
+        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        // for(int i=0;i<outsize-1;i++){
+        //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        // }
+        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // free(str);
+
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
     }
 
     return 0;
@@ -2209,13 +2232,15 @@ gettimeofdayFunc(SyscallDesc *desc, ThreadContext *tc,
         unsigned char *outdata = (unsigned char *)(&tp_temp);
         unsigned long long dstaddr = tc->readIntReg(10);
         unsigned long long res = 0;
-        char *str = (char *)malloc(1000 + outsize*8); //
-        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
-        for(int i=0;i<outsize-1;i++){
-            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
-        }
-        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-        free(str);
+        // char *str = (char *)malloc(1000 + outsize*8); //
+        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        // for(int i=0;i<outsize-1;i++){
+        //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        // }
+        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // free(str);
+
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
     }
 
     return 0;
@@ -2426,13 +2451,15 @@ timesFunc(SyscallDesc *desc, ThreadContext *tc, VPtr<typename OS::tms> bufp)
         unsigned char *outdata = (unsigned char *)(&temp);
         unsigned long long dstaddr = tc->readIntReg(10);
         unsigned long long res = clocks;
-        char *str = (char *)malloc(1000 + outsize*8); //
-        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
-        for(int i=0;i<outsize-1;i++){
-            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
-        }
-        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-        free(str);
+        // char *str = (char *)malloc(1000 + outsize*8); //
+        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        // for(int i=0;i<outsize-1;i++){
+        //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        // }
+        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // free(str);
+
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
     }
 
     // Return clock ticks since system boot
@@ -2460,13 +2487,15 @@ timeFunc(SyscallDesc *desc, ThreadContext *tc, VPtr<> taddr)
         unsigned char *outdata = (unsigned char *)(&sec);
         unsigned long long dstaddr = tc->readIntReg(10);
         unsigned long long res = sec;
-        char *str = (char *)malloc(1000 + outsize*8); //
-        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
-        for(int i=0;i<outsize-1;i++){
-            sprintf(str, "%s\"0x%x\",", str, outdata[i]);
-        }
-        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-        free(str);
+        // char *str = (char *)malloc(1000 + outsize*8); //
+        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
+        // for(int i=0;i<outsize-1;i++){
+        //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
+        // }
+        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
+        // free(str);
+
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
     }
 
     return sec;
@@ -2751,14 +2780,16 @@ readFunc(SyscallDesc *desc, ThreadContext *tc,
     BufferArg buf_arg(buf_ptr, nbytes);
     int bytes_read = read(sim_fd, buf_arg.bufferPtr(), nbytes);
     if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) { 
-        char *str = (char *)malloc(1000+nbytes*8);
-        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"read\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), tgt_fd, (unsigned long long)buf_ptr, nbytes, bytes_read);
+        // char *str = (char *)malloc(1000+nbytes*8);
+        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"read\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), tgt_fd, (unsigned long long)buf_ptr, nbytes, bytes_read);
         unsigned char *data1 = (unsigned char *)buf_arg.bufferPtr();
-        for(int i=0;i<nbytes-1;i++){
-            sprintf(str, "%s\"0x%x\",", str, data1[i]);
-        }
-        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, data1[nbytes-1]);
-        free(str);
+        // for(int i=0;i<nbytes-1;i++){
+        //     sprintf(str, "%s\"0x%x\",", str, data1[i]);
+        // }
+        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, data1[nbytes-1]);
+        // free(str);
+
+        ckpt_add_sysexe(tc->pcState().pc(), bytes_read, (uint64_t)buf_ptr, nbytes, data1);
     }
 
     if (bytes_read > 0)
@@ -2800,14 +2831,16 @@ writeFunc(SyscallDesc *desc, ThreadContext *tc,
 
     int bytes_written = write(sim_fd, buf_arg.bufferPtr(), nbytes);
     if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::ShowSyscall)) { 
-        char *str = (char *)malloc(1000+nbytes*8);
-        sprintf(str, "{\"type\":\"syscall info\", \"info\": \"write\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), tgt_fd, (unsigned long long)buf_ptr, nbytes, bytes_written);
+        // char *str = (char *)malloc(1000+nbytes*8);
+        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"write\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), tgt_fd, (unsigned long long)buf_ptr, nbytes, bytes_written);
         unsigned char *data1 = (unsigned char *)buf_arg.bufferPtr();
-        for(int i=0;i<nbytes-1;i++){
-            sprintf(str, "%s\"0x%x\",", str, data1[i]);
-        }
-        DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, data1[nbytes-1]);
-        free(str);
+        // for(int i=0;i<nbytes-1;i++){
+        //     sprintf(str, "%s\"0x%x\",", str, data1[i]);
+        // }
+        // DPRINTF(ShowSyscall, "%s\"0x%x\" ]}\n", str, data1[nbytes-1]);
+        // free(str);
+
+        ckpt_add_sysexe(tc->pcState().pc(), bytes_written, (uint64_t)buf_ptr, nbytes, data1);
     }
     if (bytes_written != -1)
         fsync(sim_fd);
