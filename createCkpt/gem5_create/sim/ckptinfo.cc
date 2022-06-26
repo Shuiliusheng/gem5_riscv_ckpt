@@ -193,6 +193,25 @@ bool CkptInfo::detectOver(uint64_t exit_place, uint64_t exit_pc, uint64_t instin
   this->textsize = this->getRange(this->textAccess, this->textrange);
   this->memsize = this->getRange(this->preAccess, this->memrange);
 
+  int len = textrange.size();
+  int textend = textrange[len-1].addr + textrange[len-1].size;
+  if(memrange.size() > 0 && memrange[0].addr < textend) {
+    printf("memrange and textrange are overlap: 0x%lx, 0x%lx\n", textend, memrange[0].addr);
+    vector<CodeRange>::iterator iter;
+    for (iter = memrange.begin(); iter != memrange.end();){
+      if (iter->addr > textend) {
+        uint64_t temp = iter->addr + iter->size;
+        if(temp > textend) {
+          iter->addr = textend;
+          iter->size = temp - textend;
+        }
+        else {
+          iter = memrange.erase(iter);
+        }
+      }
+    }
+  }
+  
   saveDetailInfo();
   saveCkptInfo();
   // saveSysInfo();
@@ -300,7 +319,129 @@ void CkptInfo::saveCkptInfo()
 }
 
 
+bool isSameSyscall(SyscallInfo *info1, SyscallInfo *info2)
+{
+    if(info1->pc != info2->pc) 
+      return false;
+    if(info1->num != info2->num) 
+      return false;
+    if(info1->hasret != info2->hasret) 
+      return false;
+    if(info1->ret != info2->ret) 
+      return false;
+    if(info1->params[0] != info2->params[0]) 
+      return false;
+    if(info1->data.size() == 0)
+      return true;
+      
+    if(info1->data.size() != info2->data.size()) 
+      return false;
+    if(info1->bufaddr != info2->bufaddr)
+      return false;
+    for(int i=0;i<info1->data.size();i++){
+      if(info1->data[i]!=info2->data[i])
+        return false;
+    }
+
+    return true;
+}
+
+uint32_t dectect_Sysinfos(vector<SyscallInfo> &sysinfos, uint32_t idx, set<uint64_t> &prepc, set<uint32_t> &prenum, vector<uint32_t> &newinfos)
+{
+  uint32_t res=0;
+  if(prepc.find(sysinfos[idx].pc) == prepc.end() || prenum.find(sysinfos[idx].num) == prenum.end()) {
+    newinfos.push_back(idx);
+    res = newinfos.size()-1;
+  }
+  else {
+    int c = 0;
+    for(c = 0; c < newinfos.size(); c ++) {
+      if(isSameSyscall(&sysinfos[idx], &sysinfos[newinfos[c]]))
+        break;
+    }
+    if(c == newinfos.size()) {
+      newinfos.push_back(idx);
+      res = newinfos.size()-1;
+    }
+    else {
+      res = c;
+    }
+  }
+  prepc.insert(sysinfos[idx].pc);
+  prenum.insert(sysinfos[idx].num);
+  return res;
+}
+
 void CkptInfo::saveSysInfo(FILE *p)
+{
+  vector<uint32_t> sys_idxs;
+  vector<uint32_t> newsysinfos, newsysinfos1; //no data
+  set<uint64_t> prepc, prepc1;
+  set<uint32_t> prenum, prenum1;
+  uint32_t num1 = 0;
+  for(int i=0;i<sysinfos.size();i++) {
+    if(sysinfos[i].data.size() != 0){
+      sys_idxs.push_back(dectect_Sysinfos(sysinfos, i, prepc1, prenum1, newsysinfos1));
+      num1 ++;
+    }
+    else{
+      sys_idxs.push_back(dectect_Sysinfos(sysinfos, i, prepc, prenum, newsysinfos));
+    }
+  }
+
+  int size1 = newsysinfos.size();
+  for(int i=0;i<sysinfos.size();i++) {
+    if(sysinfos[i].data.size()!= 0) {
+      sys_idxs[i] += size1;
+    }
+  }
+
+  printf("before syscall num: (%d %d), after num: (%d %d)\n", num1, sysinfos.size()-num1, newsysinfos1.size(), size1);
+
+  uint64_t idx_size = 4*sysinfos.size();
+  uint64_t info_size = 5*8*(newsysinfos.size()+newsysinfos1.size());
+  uint64_t data_addr = idx_size + info_size + 8; 
+  uint64_t invalid_addr = 0xffffffff; 
+  uint64_t temp = sysinfos.size();
+  fwrite(&temp, sizeof(uint64_t), 1, p);
+  fwrite(&sys_idxs[0], sizeof(uint32_t), temp, p);
+
+  uint64_t mem[10];
+  for(int i=0; i<newsysinfos.size(); i++) {
+    int idx = newsysinfos[i];
+    mem[0] = sysinfos[idx].pc;
+    mem[1] = (sysinfos[idx].num << 32) + sysinfos[idx].data.size();
+    mem[2] = sysinfos[idx].params[0];
+    mem[3] = sysinfos[idx].ret;
+    mem[4] = (sysinfos[idx].hasret) ? (invalid_addr<<8) + 1 : (invalid_addr<<8) + 0;
+    fwrite(&mem[0], sizeof(uint64_t), 5, p);
+  }
+
+  for(int i=0; i<newsysinfos1.size(); i++) {
+    int idx = newsysinfos1[i];
+    mem[0] = sysinfos[idx].pc;
+    mem[1] = (sysinfos[idx].num << 32) + sysinfos[idx].data.size();
+    mem[2] = sysinfos[idx].params[0];
+    mem[3] = sysinfos[idx].ret;
+    mem[4] = (sysinfos[idx].hasret) ? (data_addr<<8) + 1 : (data_addr<<8) + 0;
+    fwrite(&mem[0], sizeof(uint64_t), 5, p);
+    data_addr = data_addr + sysinfos[idx].data.size() + sizeof(uint64_t);  //add the bufaddr information size
+  }
+
+  for(int i=0; i<newsysinfos1.size(); i++) {
+    int idx = newsysinfos1[i];
+    fwrite(&sysinfos[idx].bufaddr, sizeof(uint64_t), 1, p);
+    fwrite(&sysinfos[idx].data[0], 1, sysinfos[idx].data.size(), p);
+  }
+
+  sys_idxs.clear();
+  newsysinfos.clear(), newsysinfos1.clear(); //no data
+  prepc.clear(), prepc1.clear();
+  prenum.clear(), prenum1.clear();
+}
+
+
+void CkptInfo::saveSysInfo1(FILE *p)
 {
   uint64_t data_addr = 10*8*sysinfos.size() + 8; 
   uint64_t invalid_addr = 0xffffffff; 

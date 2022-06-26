@@ -2855,8 +2855,9 @@ readFunc(SyscallDesc *desc, ThreadContext *tc,
         // }
         // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, data1[nbytes-1]);
         // free(str);
+        uint64_t datasize = bytes_read > 0 ? bytes_read: 0;
 
-        ckpt_add_sysexe(tc->pcState().pc(), bytes_read, (uint64_t)buf_ptr, nbytes, data1);
+        ckpt_add_sysexe(tc->pcState().pc(), bytes_read, (uint64_t)buf_ptr, datasize, data1);
     }
 
     if (bytes_read > 0)
@@ -2900,14 +2901,14 @@ writeFunc(SyscallDesc *desc, ThreadContext *tc,
     if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) { 
         // char *str = (char *)malloc(1000+nbytes*8);
         // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"write\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), tgt_fd, (unsigned long long)buf_ptr, nbytes, bytes_written);
-        unsigned char *data1 = (unsigned char *)buf_arg.bufferPtr();
+        // unsigned char *data1 = (unsigned char *)buf_arg.bufferPtr();
         // for(int i=0;i<nbytes-1;i++){
         //     sprintf(str, "%s\"0x%x\",", str, data1[i]);
         // }
         // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, data1[nbytes-1]);
         // free(str);
 
-        ckpt_add_sysexe(tc->pcState().pc(), bytes_written, (uint64_t)buf_ptr, nbytes, data1);
+        // ckpt_add_sysexe(tc->pcState().pc(), bytes_written, (uint64_t)buf_ptr, nbytes, data1);
     }
     if (bytes_written != -1)
         fsync(sim_fd);

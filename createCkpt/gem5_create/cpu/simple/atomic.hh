@@ -61,7 +61,7 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     void init() override;
 
     uint64_t tempregs[32];
-    uint64_t ckpt_startinsts, ckpt_endinsts;
+    uint64_t ckpt_startinsts, ckpt_endinsts, ckptinsts, benchinsts;
 
     bool needshowFirst = false;
     bool startlog = false;

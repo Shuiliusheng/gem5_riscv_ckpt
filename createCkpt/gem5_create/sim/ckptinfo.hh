@@ -38,7 +38,7 @@ class SyscallInfo{
   public:
     string name;
     uint64_t pc;
-    uint32_t num;
+    uint64_t num;
     uint64_t ret;
     bool hasret;
     uint64_t bufaddr;
@@ -130,6 +130,7 @@ class CkptInfo{
     void saveDetailInfo();
     void saveCkptInfo();
     void saveSysInfo(FILE *p);
+    void saveSysInfo1(FILE *p);
 };
 
 

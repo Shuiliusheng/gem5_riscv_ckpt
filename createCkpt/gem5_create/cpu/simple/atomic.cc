@@ -93,6 +93,8 @@ AtomicSimpleCPU::AtomicSimpleCPU(const AtomicSimpleCPUParams &p)
 
     ckpt_startinsts = p.ckpt_startinsts;
     ckpt_endinsts = p.ckpt_endinsts;
+    ckptinsts = p.ckptinsts;
+    benchinsts = 0;
 
     if(ckpt_startinsts == 0){
         startlog = true;
@@ -637,7 +639,7 @@ AtomicSimpleCPU::tick()
 {
     DPRINTF(SimpleCPU, "Tick\n");
 
-    if(pendingCkpts.size() == 0 && ckptidx == ckptsettings.ctrls.size()){
+    if(pendingCkpts.size() == 0 && ckptidx == ckptsettings.ctrls.size() && ckptsettings.ctrls.size()!=0){
         printf("all ckpts are created.\n");
         exit(0);
     }
