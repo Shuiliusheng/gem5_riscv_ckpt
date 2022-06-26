@@ -185,6 +185,11 @@ bool CkptInfo::detectOver(uint64_t exit_place, uint64_t exit_pc, uint64_t instin
   }
 
   this->getFistloads();
+  for(int i=0;i<firstloads.size();i++){
+    for(int c=0;c<8;c++) {
+      this->preAccess.insert(firstloads[i].addr + c);
+    }
+  }
   this->textsize = this->getRange(this->textAccess, this->textrange);
   this->memsize = this->getRange(this->preAccess, this->memrange);
 
