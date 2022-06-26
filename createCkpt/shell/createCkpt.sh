@@ -15,9 +15,6 @@ fi
 settings=$2
 options="--options=$3"
 
-basename=`echo $(basename $bench) |awk -F '.' '{print $1}'`
-logfile="$basename.log"
-
 #riscv-pk stack = 3fbe9000, mmap = 3fbe9000
 #stacktop=801017856  #0x2fbe9000
 #mmapend=789483520   #0x2f0e9000
@@ -25,6 +22,6 @@ logfile="$basename.log"
 #stacktop=10000 #270582939648  #0x3f00000000
 #mmapend=10000 #261993005056   #0x3d00000000
 
-debugflags="CreateCkpt"
-echo "build/RISCV/gem5.opt --debug-flag=$debugflags --debug-file=$logfile ./configs/example/se.py --mem-type=SimpleMemory --mem-size=8GB --ckptsetting=$settings -c $bench $options"
-build/RISCV/gem5.opt --debug-flag=$debugflags --debug-file=$logfile ./configs/example/se.py --mem-type=SimpleMemory --mem-size=8GB --ckptsetting=$settings -c $bench "$options"
+gem5_dir=/home/gem5_src/gem5
+echo "build/RISCV/gem5.fast ./configs/example/se.py --mem-type=SimpleMemory --mem-size=8GB --ckptsetting=$settings -c $bench $options"
+$gem5_dir/build/RISCV/gem5.fast $gem5_dir/configs/example/se.py --cpu-type=NonCachingSimpleCPU --mem-type=SimpleMemory --mem-size=8GB --ckptsetting=$settings -c $bench "$options"

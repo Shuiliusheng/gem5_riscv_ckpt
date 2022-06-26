@@ -993,7 +993,7 @@ openatFunc(SyscallDesc *desc, ThreadContext *tc,
     DPRINTF_SYSCALL(Verbose, "%s: sim_fd[%d], target_fd[%d] -> path:%s\n"
                     "(inferred from:%s)\n", desc->name(),
                     sim_fd, tgt_fd, used_path.c_str(), path.c_str());
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) { 
+    if (needCreateCkpt) { 
         // DPRINTF(CreateCkpt, "{\"type\":\"syscall info\", \"info\": \"open\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"filename\": \"%s\", \"flag\": \"0x%x\", \"mode\": \"0x%x\"}\n", tc->pcState().pc(), tgt_fd, path.c_str(), tgt_flags, mode);
 
         ckpt_add_sysexe(tc->pcState().pc(), 0, 0, 0, NULL);
@@ -1077,7 +1077,7 @@ sysinfoFunc(SyscallDesc *desc, ThreadContext *tc,
     tempinfo.totalram = process->system->memSize();
     tempinfo.mem_unit = 1;
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         unsigned outsize = sizeof(tempinfo); 
         unsigned char *outdata = (unsigned char *)(&tempinfo);
         unsigned long long dstaddr = tc->readIntReg(10);
@@ -1185,7 +1185,7 @@ pollFunc(SyscallDesc *desc, ThreadContext *tc,
      * in the structure.
      */
     fdsBuf.copyOut(tc->getVirtProxy());
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         unsigned outsize = sizeof(struct pollfd) * nfds; 
         unsigned char *outdata = (unsigned char *)(fdsBuf.bufferPtr());
         unsigned long long dstaddr = (unsigned long long)fdsPtr;
@@ -1321,7 +1321,7 @@ statFunc(SyscallDesc *desc, ThreadContext *tc,
         return -errno;
 
     copyOutStatBuf<OS>(tgt_stat, &hostBuf);
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         typename OS::tgt_stat temp_stat;
         copyOutStatBuf1<OS>(&temp_stat, &hostBuf);
         unsigned outsize = sizeof(temp_stat); 
@@ -1364,7 +1364,7 @@ stat64Func(SyscallDesc *desc, ThreadContext *tc,
         return -errno;
 
     copyOutStat64Buf<OS>(tgt_stat, &hostBuf);
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         typename OS::tgt_stat64 temp_stat;
         copyOutStat64Buf1<OS>(&temp_stat, &hostBuf);
         unsigned outsize = sizeof(temp_stat); 
@@ -1417,7 +1417,7 @@ fstatat64Func(SyscallDesc *desc, ThreadContext *tc,
 
     copyOutStat64Buf<OS>(tgt_stat, &hostBuf);
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         typename OS::tgt_stat64 temp_stat;
         copyOutStat64Buf1<OS>(&temp_stat, &hostBuf);
         unsigned outsize = sizeof(temp_stat); 
@@ -1465,7 +1465,7 @@ fstat64Func(SyscallDesc *desc, ThreadContext *tc,
 
     copyOutStat64Buf<OS>(tgt_stat, &hostBuf, (sim_fd == 1));
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         typename OS::tgt_stat64 temp_stat;
         copyOutStat64Buf1<OS>(&temp_stat, &hostBuf, (sim_fd == 1));
         unsigned outsize = sizeof(temp_stat); 
@@ -1539,7 +1539,7 @@ lstat64Func(SyscallDesc *desc, ThreadContext *tc,
 
     copyOutStat64Buf<OS>(tgt_stat, &hostBuf);
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         typename OS::tgt_stat64 temp_stat;
         copyOutStat64Buf1<OS>(&temp_stat, &hostBuf);
         unsigned outsize = sizeof(temp_stat); 
@@ -1610,7 +1610,7 @@ statfsFunc(SyscallDesc *desc, ThreadContext *tc,
 
     copyOutStatfsBuf<OS>(tgt_stat, &hostBuf);
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         typename OS::tgt_statfs temp_stat;
         copyOutStatfsBuf1<OS>(&temp_stat, &hostBuf);
         unsigned outsize = sizeof(temp_stat); 
@@ -1781,7 +1781,7 @@ fstatfsFunc(SyscallDesc *desc, ThreadContext *tc,
 
     copyOutStatfsBuf<OS>(tgt_stat, &hostBuf);
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         typename OS::tgt_statfs temp_stat;
         copyOutStatfsBuf1<OS>(&temp_stat, &hostBuf);
         unsigned outsize = sizeof(temp_stat); 
@@ -2108,7 +2108,7 @@ getrlimitFunc(SyscallDesc *desc, ThreadContext *tc,
         break;
     }
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         unsigned outsize = sizeof(rlp_temp); 
         unsigned char *outdata = (unsigned char *)(&rlp_temp);
         unsigned long long dstaddr = tc->readIntReg(11);
@@ -2163,7 +2163,7 @@ prlimitFunc(SyscallDesc *desc, ThreadContext *tc,
             break;
         }
 
-        if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+        if (needCreateCkpt) {
             unsigned outsize = sizeof(rlp_temp); 
             unsigned char *outdata = (unsigned char *)(&rlp_temp);
             unsigned long long dstaddr = tc->readIntReg(13);
@@ -2194,7 +2194,7 @@ clock_gettimeFunc(SyscallDesc *desc, ThreadContext *tc,
     tp->tv_sec = htog(tp->tv_sec, OS::byteOrder);
     tp->tv_nsec = htog(tp->tv_nsec, OS::byteOrder);
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         typename OS::timespec tp_temp;
         getElapsedTimeNano(tp_temp.tv_sec, tp_temp.tv_nsec);
         tp_temp.tv_sec += seconds_since_epoch;
@@ -2227,7 +2227,7 @@ clock_getresFunc(SyscallDesc *desc, ThreadContext *tc, int clk_id,
     tp->tv_sec = 0;
     tp->tv_nsec = 1;
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         typename OS::timespec tp_temp;
         tp_temp.tv_nsec = 1;
         tp_temp.tv_sec = 0;
@@ -2261,7 +2261,7 @@ gettimeofdayFunc(SyscallDesc *desc, ThreadContext *tc,
     tp->tv_sec = htog(tp->tv_sec, OS::byteOrder);
     tp->tv_usec = htog(tp->tv_usec, OS::byteOrder);
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         typename OS::timeval tp_temp;
         getElapsedTimeMicro(tp_temp.tv_sec, tp_temp.tv_usec);
         tp_temp.tv_sec += seconds_since_epoch;
@@ -2479,7 +2479,7 @@ getrusageFunc(SyscallDesc *desc, ThreadContext *tc,
         warn("getrusage() only supports RUSAGE_SELF.  Parameter %d ignored.",
              who);
     }
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         unsigned outsize = sizeof(temp); 
         unsigned char *outdata = (unsigned char *)(&temp);
         unsigned long long dstaddr = tc->readIntReg(11);
@@ -2513,7 +2513,7 @@ timesFunc(SyscallDesc *desc, ThreadContext *tc, VPtr<typename OS::tms> bufp)
     bufp->tms_utime = htog(bufp->tms_utime, OS::byteOrder);
 
     
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         unsigned outsize = sizeof(temp); 
         unsigned char *outdata = (unsigned char *)(&temp);
         unsigned long long dstaddr = tc->readIntReg(10);
@@ -2549,7 +2549,7 @@ timeFunc(SyscallDesc *desc, ThreadContext *tc, VPtr<> taddr)
         p.writeBlob(taddr, &t, (int)sizeof(typename OS::time_t));
     }
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         unsigned outsize = sizeof(typename OS::time_t); 
         unsigned char *outdata = (unsigned char *)(&sec);
         unsigned long long dstaddr = tc->readIntReg(10);
@@ -2846,7 +2846,7 @@ readFunc(SyscallDesc *desc, ThreadContext *tc,
 
     BufferArg buf_arg(buf_ptr, nbytes);
     int bytes_read = read(sim_fd, buf_arg.bufferPtr(), nbytes);
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) { 
+    if (needCreateCkpt) { 
         // char *str = (char *)malloc(1000+nbytes*8);
         // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"read\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), tgt_fd, (unsigned long long)buf_ptr, nbytes, bytes_read);
         unsigned char *data1 = (unsigned char *)buf_arg.bufferPtr();
@@ -2898,7 +2898,7 @@ writeFunc(SyscallDesc *desc, ThreadContext *tc,
     }
 
     int bytes_written = write(sim_fd, buf_arg.bufferPtr(), nbytes);
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) { 
+    if (needCreateCkpt) { 
         // char *str = (char *)malloc(1000+nbytes*8);
         // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"write\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), tgt_fd, (unsigned long long)buf_ptr, nbytes, bytes_written);
         // unsigned char *data1 = (unsigned char *)buf_arg.bufferPtr();

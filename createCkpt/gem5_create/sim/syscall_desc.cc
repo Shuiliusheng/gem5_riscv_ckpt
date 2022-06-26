@@ -53,13 +53,9 @@ SyscallDesc::doSyscall(ThreadContext *tc)
     else
         DPRINTF_SYSCALL(Base, "Returned %d.\n", retval.encodedValue());
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) { 
+    // if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) { 
+    if (needCreateCkpt) { 
         RegVal num = tc->readIntReg(17);
-        // if (retval.suppressed())
-        //     DPRINTF(CreateCkpt, "{\"type\":\"syscall return\", \"sysnum\": \"0x%x\", \"sysname\":\"(%s)\", \"pc\": \"0x%llx\", \"res\":\"no ret\"\n", num, dumper(name(), tc).c_str(), tc->pcState().pc());
-        // else
-        //     DPRINTF(CreateCkpt, "{\"type\":\"syscall return\", \"sysnum\": \"0x%x\", \"sysname\":\"(%s)\", \"pc\": \"0x%llx\", \"res\":\"has ret\", \"val\": \"0x%llx\"}\n", num, dumper(name(), tc).c_str(), tc->pcState().pc(), retval.encodedValue());
-
         ckpt_add_sysret(tc->pcState().pc(), dumper(name(), tc), !retval.suppressed(), retval.encodedValue());
     }
 }

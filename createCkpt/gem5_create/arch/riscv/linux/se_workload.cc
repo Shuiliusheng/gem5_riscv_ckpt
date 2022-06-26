@@ -90,13 +90,13 @@ EmuLinux::syscall(ThreadContext *tc)
     process->Process::syscall(tc);
 
     RegVal num = tc->readIntReg(RiscvISA::SyscallNumReg);
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) { 
+    // if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) { 
+    if (needCreateCkpt) { 
         RegVal a0 = tc->readIntReg(10);
         RegVal a1 = tc->readIntReg(11);
         RegVal a2 = tc->readIntReg(12);
         RegVal a3 = tc->readIntReg(13);
         RegVal a4 = tc->readIntReg(14);
-        // DPRINTF(CreateCkpt, "{\"type\":\"syscall enter\", \"pc\": \"0x%llx\", \"sysnum\": \"0x%x\", \"param\": [ \"0x%llx\", \"0x%llx\", \"0x%llx\", \"0x%llx\", \"0x%llx\" ]}\n", tc->pcState().pc(), num, a0, a1, a2, a3, a4);
         vector<uint64_t> params;
         params.push_back(a0);
         params.push_back(a1);
@@ -132,21 +132,11 @@ unameFunc64(SyscallDesc *desc, ThreadContext *tc, VPtr<Linux::utsname> name)
     strcpy(unametemp.version, "#1 Mon Aug 18 11:32:15 EDT 2003");
     strcpy(unametemp.machine, "riscv64");
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         unsigned outsize = sizeof(Linux::utsname); 
         unsigned char *outdata = (unsigned char *)(&unametemp);
         unsigned long long dstaddr = tc->readIntReg(10);
         unsigned long long res = 0;
-        // char *str = (char *)malloc(1000 + outsize*8); //
-        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
-        // for(int i=0;i<outsize-1;i++){
-        //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
-        // }
-	    // sprintf(str, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-        // DPRINTF1(CreateCkpt, "%s\n", str);
-        // printf("%s\n", str);
-        // free(str);
-
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
     }
 

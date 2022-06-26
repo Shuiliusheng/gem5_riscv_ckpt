@@ -98,7 +98,8 @@ exitFutexWake(ThreadContext *tc, VPtr<> addr, uint64_t tgid)
     *ctid = 0;
     ctidBuf.copyOut(tc->getVirtProxy());
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    // if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         unsigned outsize = sizeof(long); 
         unsigned char *outdata = (unsigned char *)(ctidBuf.bufferPtr());
         unsigned long long dstaddr = (unsigned long long)addr;
@@ -341,7 +342,7 @@ _llseekFunc(SyscallDesc *desc, ThreadContext *tc,
     std::memcpy(result_buf.bufferPtr(), &result, sizeof(result));
     result_buf.copyOut(tc->getVirtProxy());
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt) && result != -1) {
+    if (needCreateCkpt && result != -1) {
         unsigned outsize = sizeof(result); 
         unsigned char *outdata = (unsigned char *)(result_buf.bufferPtr());
         unsigned long long dstaddr = (unsigned long long)result_ptr;
@@ -382,7 +383,7 @@ gethostnameFunc(SyscallDesc *desc, ThreadContext *tc,
     BufferArg name(buf_ptr, name_len);
     strncpy((char *)name.bufferPtr(), hostname, name_len);
     name.copyOut(tc->getVirtProxy());
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         unsigned outsize = name_len; 
         unsigned char *outdata = (unsigned char *)(name.bufferPtr());
         unsigned long long dstaddr = (unsigned long long)buf_ptr;
@@ -420,7 +421,7 @@ getcwdFunc(SyscallDesc *desc, ThreadContext *tc,
 
     buf.copyOut(tc->getVirtProxy());
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         unsigned outsize = size; 
         unsigned char *outdata = (unsigned char *)(buf.bufferPtr());
         unsigned long long dstaddr = (unsigned long long)buf_ptr;
@@ -494,7 +495,7 @@ readlinkFunc(SyscallDesc *desc, ThreadContext *tc,
 
     buf.copyOut(tc->getVirtProxy());
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt) && result != -1) {
+    if (needCreateCkpt && result != -1) {
         unsigned outsize = result; 
         unsigned char *outdata = (unsigned char *)(buf.bufferPtr());
         unsigned long long dstaddr = (unsigned long long)buf_ptr;
@@ -909,7 +910,7 @@ pipe2Func(SyscallDesc *desc, ThreadContext *tc, VPtr<> tgt_addr, int flags)
     buf_ptr[0] = tgt_fds[0];
     buf_ptr[1] = tgt_fds[1];
     tgt_handle.copyOut(tc->getVirtProxy());
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         unsigned outsize = sizeof(int[2]); 
         unsigned char *outdata = (unsigned char *)(tgt_handle.bufferPtr());
         unsigned long long dstaddr = (unsigned long long)tgt_addr;
@@ -1183,7 +1184,7 @@ getdentsImpl(SyscallDesc *desc, ThreadContext *tc,
 
     buf_arg.copyOut(tc->getVirtProxy());
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+    if (needCreateCkpt) {
         unsigned outsize = count; 
         unsigned char *outdata = (unsigned char *)(buf_arg.bufferPtr());
         unsigned long long dstaddr = (unsigned long long)buf_ptr;

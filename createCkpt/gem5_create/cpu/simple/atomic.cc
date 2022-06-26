@@ -93,13 +93,7 @@ AtomicSimpleCPU::AtomicSimpleCPU(const AtomicSimpleCPUParams &p)
 
     ckpt_startinsts = p.ckpt_startinsts;
     ckpt_endinsts = p.ckpt_endinsts;
-    ckptinsts = p.ckptinsts;
     benchinsts = 0;
-
-    if(ckpt_startinsts == 0){
-        startlog = true;
-        ::gem5::debug::CreateCkpt.enable();
-    }
 
     printf("start ckpt: %ld, end ckpt: %ld, interval: %ld\n", p.ckpt_startinsts, p.ckpt_endinsts, p.ckptinsts);
 
@@ -437,7 +431,8 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t *data, unsigned size,
                 assert(!locked);
                 locked = true;
             }
-            if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt) && startlog) { 
+            // if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt) && startlog) { 
+            if (needCreateCkpt && startlog) { 
                 ckpt_addload(addr, data, size);
             }
             return fault;
@@ -468,7 +463,9 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
         // This must be a cache block cleaning request
         data = zero_array;
     }
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt) && startlog) { 
+    
+    if (needCreateCkpt && startlog) { 
+    // if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt) && startlog) { 
         ckpt_addstore(addr, size);
     }
 
@@ -626,7 +623,8 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
         return NoFault;
     }
 
-    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt) && startlog) { 
+    if (needCreateCkpt && startlog) { 
+    // if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt) && startlog) { 
         ckpt_addload(addr, data, size);
     }
 
@@ -734,11 +732,13 @@ AtomicSimpleCPU::tick()
                     if(hasValidCkpt()){
                         startlog = true;
                         ::gem5::debug::CreateCkpt.enable();
+                        needCreateCkpt = true;
                     }
 
                     if(!hasValidCkpt()){
                         startlog = false;
                         ::gem5::debug::CreateCkpt.disable();
+                        needCreateCkpt = false;
                     }
 
                     if(startlog) {

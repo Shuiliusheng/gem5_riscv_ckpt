@@ -109,7 +109,6 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     EventFunctionWrapper tickEvent;
 
     const int width;
-    const int ckptinsts;
     bool locked;
     const bool simulate_data_stalls;
     const bool simulate_inst_stalls;

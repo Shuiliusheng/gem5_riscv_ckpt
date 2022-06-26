@@ -3,6 +3,7 @@
 vector<CkptInfo *> pendingCkpts;
 CkptSettings ckptsettings;
 int ckptidx = 0;
+bool needCreateCkpt = false;
 
 bool cmp(CkptCtrl &ctrl1, CkptCtrl &ctrl2) { 
   return ctrl1.start < ctrl2.start; 

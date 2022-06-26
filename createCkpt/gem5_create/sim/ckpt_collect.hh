@@ -52,6 +52,6 @@ bool isCkptStart(uint64_t simNum, uint64_t &length);
 extern vector<CkptInfo *> pendingCkpts;
 extern CkptSettings ckptsettings;
 extern int ckptidx;
-
+extern bool needCreateCkpt;
 
 #endif
