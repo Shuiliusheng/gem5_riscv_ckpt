@@ -94,8 +94,8 @@ AtomicSimpleCPU::AtomicSimpleCPU(const AtomicSimpleCPUParams &p)
     ckpt_startinsts = p.ckpt_startinsts;
     ckpt_endinsts = p.ckpt_endinsts;
     benchinsts = 0;
-
-    printf("start ckpt: %ld, end ckpt: %ld, interval: %ld\n", p.ckpt_startinsts, p.ckpt_endinsts, p.ckptinsts);
+    takeSysNum = 0;
+    last_isBenchInst = false;
 
     for(int i=0;i<10;i++){
         instnums[i] = 0;
@@ -637,11 +637,6 @@ AtomicSimpleCPU::tick()
 {
     DPRINTF(SimpleCPU, "Tick\n");
 
-    if(pendingCkpts.size() == 0 && ckptidx == ckptsettings.ctrls.size() && ckptsettings.ctrls.size()!=0){
-        printf("all ckpts are created.\n");
-        exit(0);
-    }
-
     // Change thread if multi-threaded
     swapActiveThread();
 
@@ -708,8 +703,6 @@ AtomicSimpleCPU::tick()
                 //}
             }
 
-            ckpt_addinst(thread->pcState().pc());
-
             preExecute();
 
             Tick stall_ticks = 0;
@@ -718,8 +711,11 @@ AtomicSimpleCPU::tick()
                     preinsts.clear();
                 }
 
-                if(t_info.numInst % 1000000 == 0){
-                    printf("-----pc: 0x%lx -- simInsts: %ld \n", thread->pcState().pc(), t_info.numInst);
+                if(t_info.numInst % 2000000 == 0){
+                    if(readCkptSetting)
+                        printf("----- simInsts: %ld, benchNum: %ld\n", t_info.numInst, benchinsts);
+                    else
+                        printf("----- simInsts: %ld \n", t_info.numInst);
                 }
 
                 fault = curStaticInst->execute(&t_info, traceData);
@@ -731,45 +727,70 @@ AtomicSimpleCPU::tick()
 
                     if(hasValidCkpt()){
                         startlog = true;
-                        ::gem5::debug::CreateCkpt.enable();
                         needCreateCkpt = true;
                     }
-
-                    if(!hasValidCkpt()){
+                    else {
                         startlog = false;
-                        ::gem5::debug::CreateCkpt.disable();
                         needCreateCkpt = false;
+                    }
+
+                    uint64_t nowpc = thread->pcState().pc();
+                    bool isBenchInst = false;
+                    uint64_t numInst = t_info.numInst;
+                    if(readCkptSetting) {
+                        isBenchInst = nowpc > 0x200000;
+                        if(isBenchInst) {
+                            benchinsts++;
+                            numInst = benchinsts;
+                        }
+                        else {
+                           needCreateCkpt = false;
+                           startlog = false;
+                        }
+
+                        if(!isBenchInst && last_isBenchInst) {
+                            // printf("running the syscall: %d, 0x%lx\n", takeSysNum, nowpc);
+                            ckpt_insert_syscall(takeSysNum);
+                            takeSysNum ++;
+                            preinsts.clear();
+                        }
+                        last_isBenchInst = isBenchInst;
                     }
 
                     if(startlog) {
                         recordinst(curStaticInst);
+                        ckpt_addinst(nowpc);
                     }
 
                     uint64_t length = 0;
-                    if (isCkptStart(t_info.numInst, length)) {
-                        uint64_t intregs[32], fpregs[32];
-                        for(int i=0;i<32;i++){
-                            intregs[i] = thread->readIntReg(i);
-                            fpregs[i] = thread->readFloatReg(i);
+                    if(!readCkptSetting || (readCkptSetting && isBenchInst)) {
+                        if (isCkptStart(numInst, length)) {
+                            uint64_t intregs[32], fpregs[32];
+                            for(int i=0;i<32;i++){
+                                intregs[i] = thread->readIntReg(i);
+                                fpregs[i] = thread->readFloatReg(i);
+                            }
+                            addCkpt(numInst, length, intregs, fpregs, nowpc, thread->nextInstAddr(), instnums);
+                            printf("+++++ createCkpt, inst_num: %ld, %ld\n", numInst, length);
                         }
-                        addCkpt(t_info.numInst, length, intregs, fpregs, thread->pcState().pc(), thread->nextInstAddr(), instnums);
-
-                        printf("create Ckpt, start with inst number: %ld, %ld\n", t_info.numInst, length);
                     }
 
                     if(startlog) {
-                        if(t_info.numInst >= pendingCkpts[0]->startnum + pendingCkpts[0]->length) {
-                            if(!curStaticInst->isCompressed) {
-                                uint64_t nowpc = thread->pcState().pc();
+                        if(numInst >= pendingCkpts[0]->startnum + pendingCkpts[0]->length) {
+                            if(!curStaticInst->isCompressed && !curStaticInst->isSyscall()) {
                                 bool isInPre = preinsts.find(nowpc) != preinsts.end();
                                 if(!isInPre){
-                                    printf("{\"type\": \"ckptExitInst\", \"inst_num\": \"%ld\", \"inst_pc\": \"0x%lx\"}\n", t_info.numInst, nowpc);
-                                    ckpt_detectOver(t_info.numInst, nowpc, instnums);
+                                    printf("***** ckptExitInst, inst_num: %ld, pc: 0x%lx\n", t_info.numInst, nowpc);
+                                    ckpt_detectOver(numInst, nowpc, instnums);
+                                    if(pendingCkpts.size() == 0 && ckptidx == ckptsettings.ctrls.size() && ckptsettings.ctrls.size()!=0){
+                                        printf("all ckpts are created.\n");
+                                        exit(0);
+                                    }
                                 } 
                             }
                         }
                         if(!curStaticInst->isCompressed) {
-                            preinsts.insert(thread->pcState().pc());
+                            preinsts.insert(nowpc);
                         }
                     }
                 } else if (traceData) {

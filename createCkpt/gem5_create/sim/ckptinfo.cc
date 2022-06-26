@@ -396,7 +396,7 @@ void CkptInfo::saveSysInfo(FILE *p)
     }
   }
 
-  printf("before syscall num: (%d %d), after num: (%d %d)\n", num1, sysinfos.size()-num1, newsysinfos1.size(), size1);
+  // printf("before syscall num: (%d %d), after num: (%d %d)\n", num1, sysinfos.size()-num1, newsysinfos1.size(), size1);
 
   uint64_t idx_size = 4*sysinfos.size();
   uint64_t info_size = 5*8*(newsysinfos.size()+newsysinfos1.size());

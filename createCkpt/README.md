@@ -2,15 +2,13 @@
 #### 使用方法
 1. 创建ckpt示例
     - 额外注意：编译程序时需要指定特定的link文件，具体示例在bench中存在(build.sh)
+    - 该版本中不再使用gem5 debugflag, 因此可以执行使用gem5.fast来加速模拟过程
+    - 该版本支持使用readckpt_new.riscv来执行ckpt文件，以此来重新创建新的ckpt文件
     ```shell
-        ./build/RISCV/gem5.opt --debug-flag=CreateCkpt --debug-file=temp ./configs/example/se.py --mem-type=SimpleMemory --mem-size=8GB --ckptsetting=settings -c bench/test.riscv
+        ./build/RISCV/gem5.fast ./configs/example/se.py --cpu-type=NonCachingSimpleCPU --mem-type=SimpleMemory --mem-size=8GB --ckptsetting=settings -c bench/test.riscv --options=""
     ```
 2. gem5之外的参数解释
     - (除此之外均为gem5原本的参数)
-    - 参数：--debug-flag=CreateCkpt
-        - 用于表示是否需要创建checkpoint
-    - 参数：--debug-file=logfile (可以不需要)
-        - 用于控制log文件的位置和名称，原本gem5的参数
     - 参数：--ckptsettings=settingsfile 
         - 用于指定生成ckpt的一些参数信息，包括
             - mmapend/stacktop: 指定运行时的栈基址和map的最大位置
@@ -20,12 +18,27 @@
                 - interval: 从startckpt开始间隔多少条指令创建一个ckpt
                 - warmupnum: 每一个ckpt提前准备多少条指令用于恢复时的预热
                 - times: 创建几个ckpt
+            - readckpt: ./perlbench_ckpt_10000000.info 
+              - readckpt: 用于指明当前是利用readckpt.riscv来读取一个已有的ckpt文件来重新创建不同的片段文件
+              - ./perlbench_ckpt_10000000.info: 用于指明readckpt正在读取的ckpt文件。在执行过程中通过读取该文件中的系统调用信息来创建新的ckpt文件
         ```c
+            //正常创建ckpt文件的settings文件样例
+            //./build/RISCV/gem5.fast ./configs/example/se.py --cpu-type=NonCachingSimpleCPU --mem-type=SimpleMemory --mem-size=8GB --ckptsetting=settings -c bench/test.riscv
             mmapend: 261993005056
             stacktop: 270582939648
             ckptprefix: ./test
             ckptctrl: 10000 10000 1000 4
             ckptctrl: 60000 20000 1000 4
+        ```
+
+        ```c
+            //利用readckpt_new.riscv执行ckpt文件，并且重新创建新的ckpt文件的方法
+            //.,... --ckptsetting=settings -c 利用readckpt_new.riscv --options="./perlbench_ckpt_10000000.info ./perlbench.riscv"
+            mmapend: 7894835200
+            stacktop: 8010178560
+            ckptprefix: ./res/perlbench
+            ckptctrl: 100 5000000 500000 4
+            readckpt: ./perlbench_ckpt_10000000.info
         ```
 
 #### 工作方式简介

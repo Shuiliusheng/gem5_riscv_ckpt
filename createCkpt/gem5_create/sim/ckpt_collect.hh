@@ -47,11 +47,14 @@ void ckpt_detectOver(uint64_t exit_place, uint64_t exit_pc, uint64_t instinfo[])
 void init_ckpt_settings(const char filename[]);
 bool hasValidCkpt();
 bool isCkptStart(uint64_t simNum, uint64_t &length);
-
+void initCkptSysInfo(char *filename);
+void ckpt_insert_syscall(uint32_t sysidx);
 
 extern vector<CkptInfo *> pendingCkpts;
 extern CkptSettings ckptsettings;
 extern int ckptidx;
 extern bool needCreateCkpt;
+extern bool readCkptSetting;
+extern uint64_t takeOverSysAddr;
 
 #endif

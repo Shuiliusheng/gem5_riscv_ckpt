@@ -4,6 +4,7 @@ vector<CkptInfo *> pendingCkpts;
 CkptSettings ckptsettings;
 int ckptidx = 0;
 bool needCreateCkpt = false;
+bool readCkptSetting = false;
 
 bool cmp(CkptCtrl &ctrl1, CkptCtrl &ctrl2) { 
   return ctrl1.start < ctrl2.start; 
@@ -60,6 +61,13 @@ void init_ckpt_settings(const char filename[])
         ckptsettings.ctrls.push_back(ctrl);
       }
     }
+    else if(temp.find("readckpt") != temp.npos) {
+      idx = idx + 1;
+      for(; idx<strlen(str) && str[idx] ==' '; idx++);
+      printf("create ckpt with readckpt, ckptfile: %s\n", &str[idx]);
+      initCkptSysInfo(&str[idx]);
+      readCkptSetting = true;
+    }
     else{
       printf("%s", str);
     }
@@ -102,22 +110,22 @@ void ckpt_addinst(uint64_t addr)
 
 void ckpt_add_sysenter(uint64_t pc, uint32_t sysnum, vector<uint64_t> &params) 
 {
-  if(pendingCkpts.size() > 0) {
-    pendingCkpts[pendingCkpts.size()-1]->add_sysenter(pc, sysnum, params);
+  for(int i=0;i<pendingCkpts.size();i++){
+    pendingCkpts[i]->add_sysenter(pc, sysnum, params);
   }
 }
 
 void ckpt_add_sysexe(uint64_t pc, uint64_t ret, uint64_t bufaddr, uint32_t bufsize, uint8_t data[]) 
 {
-  if(pendingCkpts.size() > 0) {
-    pendingCkpts[pendingCkpts.size()-1]->add_sysexe(pc, ret, bufaddr, bufsize, data);
+  for(int i=0;i<pendingCkpts.size();i++){
+    pendingCkpts[i]->add_sysexe(pc, ret, bufaddr, bufsize, data);
   }
 }
 
 void ckpt_add_sysret(uint64_t pc, string name, bool hasret, uint64_t ret)
 {
-  if(pendingCkpts.size() > 0) {
-    pendingCkpts[pendingCkpts.size()-1]->add_sysret(pc, name, hasret, ret);
+  for(int i=0;i<pendingCkpts.size();i++){
+    pendingCkpts[i]->add_sysret(pc, name, hasret, ret);
   }
 }
 
@@ -160,7 +168,89 @@ bool isCkptStart(uint64_t simNum, uint64_t &length)
     }
 }
 
+uint64_t syscall_info_addr = 0;
+uint64_t totalcallnum = 0;
+uint64_t infoaddr = 0;
+uint32_t *sysidxs = NULL;
 
+void initCkptSysInfo(char *filename)
+{
+  FILE *p = fopen(filename,"rb");
+  if(p == NULL){
+    printf("cannot open %s to read\n", filename);
+    exit(1);
+  }
+  uint64_t numtext = 0, nummem = 0, numloads = 0, offset = 0;
+  fread(&numtext, sizeof(uint64_t), 1, p);
+  
+  offset = 8 + numtext*16 + 5*8 + 64*8;
+  fseek(p, offset, SEEK_SET);
+  fread(&nummem, sizeof(uint64_t), 1, p);
+  
+  offset = ftell(p) + nummem*16;
+  fseek(p, offset, SEEK_SET);
+  fread(&numloads, sizeof(uint64_t), 1, p);
+  offset = ftell(p) + numloads*16;
+  
+  fseek(p, 0, SEEK_END);
+  uint64_t filesize = ftell(p) - offset;
+  fseek(p, offset, SEEK_SET);
 
+  uint8_t *data = (uint8_t *)malloc(filesize);
+  fread((void *)data, filesize, 1, p);
+  fclose(p);
+
+  syscall_info_addr = (uint64_t)data;
+  totalcallnum = *((uint64_t *)syscall_info_addr);
+  infoaddr = syscall_info_addr + 8 + totalcallnum*4;
+  sysidxs = (uint32_t *)(syscall_info_addr + 8);
+
+  printf("%s: text: %d, mem: %d, load: %d, sysnum: %d\n", filename, numtext, nummem, numloads, totalcallnum);
+}
+
+typedef struct{
+    uint64_t pc;
+    uint64_t num;
+    uint64_t p0;
+    uint64_t ret;
+    uint64_t data_offset;
+}NewSyscallInfo;
+
+void ckpt_insert_syscall(uint32_t sysidx) 
+{
+  if(sysidx > totalcallnum) {
+    printf("syscall num %d is overflow\n", sysidx);
+    exit(1);
+  }
+
+  if(sysidx == totalcallnum)
+    return ;
+  
+  NewSyscallInfo *infos = (NewSyscallInfo *)(infoaddr + sysidxs[sysidx]*sizeof(NewSyscallInfo));
+  uint64_t sysnum = infos->num >> 32;
+  bool hasret = (infos->data_offset % 256) == 1;
+  uint64_t bufsize = 0;
+  uint64_t bufaddr = 0;
+  uint64_t data_offset = infos->data_offset >> 8;
+  uint8_t *data = NULL;
+  string name("readckpt_syscall");
+  vector<uint64_t> params;
+  
+  if (data_offset != 0xffffffff){
+    bufaddr = *(uint64_t *)(syscall_info_addr + data_offset);
+    data = (uint8_t *)(syscall_info_addr + data_offset + 8);
+    bufsize = (infos->num<<32) >> 32;
+  }
+  params.push_back(infos->p0);
+  params.push_back(infos->p0);
+  params.push_back(infos->p0);
+  
+  for(int i=0;i<pendingCkpts.size();i++){
+    pendingCkpts[i]->add_sysenter(infos->pc, sysnum, params);
+    pendingCkpts[i]->add_sysexe(infos->pc, infos->ret, bufaddr, bufsize, data);
+    pendingCkpts[i]->add_sysret(infos->pc, name, hasret, infos->ret);
+  }
+  params.clear();
+}
 
 
