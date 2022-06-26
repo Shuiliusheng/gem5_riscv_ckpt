@@ -228,7 +228,7 @@ SyscallDescTable<SEWorkload::SyscallABI> EmuLinux::syscallDescs64 = {
     { 56,   "openat", openatFunc<RiscvLinux64> },
     { 57,   "close", closeFunc },
     { 58,   "vhangup" },
-    { 59,   "pipe2" },
+    { 59,   "pipe2", pipe2Func},
     { 60,   "quotactl" },
     { 61,   "getdents64" },
     { 62,   "lseek", lseekFunc },

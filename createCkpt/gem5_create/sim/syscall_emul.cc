@@ -98,6 +98,14 @@ exitFutexWake(ThreadContext *tc, VPtr<> addr, uint64_t tgid)
     *ctid = 0;
     ctidBuf.copyOut(tc->getVirtProxy());
 
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+        unsigned outsize = sizeof(long); 
+        unsigned char *outdata = (unsigned char *)(ctidBuf.bufferPtr());
+        unsigned long long dstaddr = (unsigned long long)addr;
+        unsigned long long res = 0;
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
+    }
+
     FutexMap &futex_map = tc->getSystemPtr()->futexMap;
     // Wake one of the waiting threads.
     futex_map.wakeup(addr, tgid, 1);
@@ -332,6 +340,15 @@ _llseekFunc(SyscallDesc *desc, ThreadContext *tc,
     BufferArg result_buf(result_ptr, sizeof(result));
     std::memcpy(result_buf.bufferPtr(), &result, sizeof(result));
     result_buf.copyOut(tc->getVirtProxy());
+
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt) && result != -1) {
+        unsigned outsize = sizeof(result); 
+        unsigned char *outdata = (unsigned char *)(result_buf.bufferPtr());
+        unsigned long long dstaddr = (unsigned long long)result_ptr;
+        unsigned long long res = 0;
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
+        printf("_llseek syscall\n");
+    }
     return 0;
 }
 
@@ -365,6 +382,14 @@ gethostnameFunc(SyscallDesc *desc, ThreadContext *tc,
     BufferArg name(buf_ptr, name_len);
     strncpy((char *)name.bufferPtr(), hostname, name_len);
     name.copyOut(tc->getVirtProxy());
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+        unsigned outsize = name_len; 
+        unsigned char *outdata = (unsigned char *)(name.bufferPtr());
+        unsigned long long dstaddr = (unsigned long long)buf_ptr;
+        unsigned long long res = 0;
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
+        printf("gethostnameFunc syscall\n");
+    }
     return 0;
 }
 
@@ -884,6 +909,14 @@ pipe2Func(SyscallDesc *desc, ThreadContext *tc, VPtr<> tgt_addr, int flags)
     buf_ptr[0] = tgt_fds[0];
     buf_ptr[1] = tgt_fds[1];
     tgt_handle.copyOut(tc->getVirtProxy());
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+        unsigned outsize = sizeof(int[2]); 
+        unsigned char *outdata = (unsigned char *)(tgt_handle.bufferPtr());
+        unsigned long long dstaddr = (unsigned long long)tgt_addr;
+        unsigned long long res = 0;
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
+        printf("pipe2 syscall\n");
+    }
 
     if (flags) {
         // pipe2 only uses O_NONBLOCK, O_CLOEXEC, and (O_NONBLOCK | O_CLOEXEC)
@@ -1146,8 +1179,18 @@ getdentsImpl(SyscallDesc *desc, ThreadContext *tc,
 
         traversed += host_reclen;
     }
+    
 
     buf_arg.copyOut(tc->getVirtProxy());
+
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+        unsigned outsize = count; 
+        unsigned char *outdata = (unsigned char *)(buf_arg.bufferPtr());
+        unsigned long long dstaddr = (unsigned long long)buf_ptr;
+        unsigned long long res = 0;
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
+        printf("getdents syscall\n");
+    }
     return status;
 }
 #endif

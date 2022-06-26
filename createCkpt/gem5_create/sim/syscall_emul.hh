@@ -997,6 +997,7 @@ openatFunc(SyscallDesc *desc, ThreadContext *tc,
         // DPRINTF(CreateCkpt, "{\"type\":\"syscall info\", \"info\": \"open\", \"pc\": \"0x%llx\", \"fd\": \"0x%llx\", \"filename\": \"%s\", \"flag\": \"0x%x\", \"mode\": \"0x%x\"}\n", tc->pcState().pc(), tgt_fd, path.c_str(), tgt_flags, mode);
 
         ckpt_add_sysexe(tc->pcState().pc(), 0, 0, 0, NULL);
+        printf("openat syscall\n");
     }
     return tgt_fd;
 }
@@ -1070,6 +1071,20 @@ sysinfoFunc(SyscallDesc *desc, ThreadContext *tc,
     sysinfo->uptime = seconds_since_epoch;
     sysinfo->totalram = process->system->memSize();
     sysinfo->mem_unit = 1;
+
+    typename OS::tgt_sysinfo tempinfo;
+    tempinfo.uptime = seconds_since_epoch;
+    tempinfo.totalram = process->system->memSize();
+    tempinfo.mem_unit = 1;
+
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+        unsigned outsize = sizeof(tempinfo); 
+        unsigned char *outdata = (unsigned char *)(&tempinfo);
+        unsigned long long dstaddr = tc->readIntReg(10);
+        unsigned long long res = 0;
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
+        printf("sysinfoFunc syscall\n");
+    }
 
     return 0;
 }
@@ -1170,6 +1185,14 @@ pollFunc(SyscallDesc *desc, ThreadContext *tc,
      * in the structure.
      */
     fdsBuf.copyOut(tc->getVirtProxy());
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+        unsigned outsize = sizeof(struct pollfd) * nfds; 
+        unsigned char *outdata = (unsigned char *)(fdsBuf.bufferPtr());
+        unsigned long long dstaddr = (unsigned long long)fdsPtr;
+        unsigned long long res = status;
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
+        printf("poll syscall\n");
+    }
 
     return status;
 }
@@ -1298,6 +1321,17 @@ statFunc(SyscallDesc *desc, ThreadContext *tc,
         return -errno;
 
     copyOutStatBuf<OS>(tgt_stat, &hostBuf);
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+        typename OS::tgt_stat temp_stat;
+        copyOutStatBuf1<OS>(&temp_stat, &hostBuf);
+        unsigned outsize = sizeof(temp_stat); 
+        unsigned char *outdata = (unsigned char *)(&temp_stat);
+        unsigned long long dstaddr = tc->readIntReg(11);
+        unsigned long long res = result;
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
+        printf("stat syscall\n");
+    }
+
 
     return 0;
 }
@@ -2088,6 +2122,7 @@ getrlimitFunc(SyscallDesc *desc, ThreadContext *tc,
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
+        printf("getrlimitFunc syscall\n");
     }
 
     return 0;
@@ -2142,6 +2177,7 @@ prlimitFunc(SyscallDesc *desc, ThreadContext *tc,
             // free(str);
 
             ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
+            printf("prlimitFunc syscall\n");
         }
     }
     return 0;
@@ -2175,6 +2211,7 @@ clock_gettimeFunc(SyscallDesc *desc, ThreadContext *tc,
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
+        printf("clock_gettimeFunc syscall\n");
     }
 
     return 0;
@@ -2207,6 +2244,7 @@ clock_getresFunc(SyscallDesc *desc, ThreadContext *tc, int clk_id,
         // free(str);
 
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
+        printf("clock_getresFunc syscall\n");
     }
 
     return 0;
@@ -2403,11 +2441,32 @@ getrusageFunc(SyscallDesc *desc, ThreadContext *tc,
     rup->ru_nvcsw = 0;
     rup->ru_nivcsw = 0;
 
+   typename OS::rusage temp;
+    temp.ru_utime.tv_sec = 0;
+    temp.ru_utime.tv_usec = 0;
+    temp.ru_stime.tv_sec = 0;
+    temp.ru_stime.tv_usec = 0;
+    temp.ru_maxrss = 0;
+    temp.ru_ixrss = 0;
+    temp.ru_idrss = 0;
+    temp.ru_isrss = 0;
+    temp.ru_minflt = 0;
+    temp.ru_majflt = 0;
+    temp.ru_nswap = 0;
+    temp.ru_inblock = 0;
+    temp.ru_oublock = 0;
+    temp.ru_msgsnd = 0;
+    temp.ru_msgrcv = 0;
+    temp.ru_nsignals = 0;
+    temp.ru_nvcsw = 0;
+    temp.ru_nivcsw = 0;
+
     switch (who) {
       case OS::TGT_RUSAGE_SELF:
         getElapsedTimeMicro(rup->ru_utime.tv_sec, rup->ru_utime.tv_usec);
         rup->ru_utime.tv_sec = htog(rup->ru_utime.tv_sec, OS::byteOrder);
         rup->ru_utime.tv_usec = htog(rup->ru_utime.tv_usec, OS::byteOrder);
+        getElapsedTimeMicro(temp.ru_utime.tv_sec, temp.ru_utime.tv_usec);
         break;
 
       case OS::TGT_RUSAGE_CHILDREN:
@@ -2419,6 +2478,14 @@ getrusageFunc(SyscallDesc *desc, ThreadContext *tc,
         // plow ahead
         warn("getrusage() only supports RUSAGE_SELF.  Parameter %d ignored.",
              who);
+    }
+    if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) {
+        unsigned outsize = sizeof(temp); 
+        unsigned char *outdata = (unsigned char *)(&temp);
+        unsigned long long dstaddr = tc->readIntReg(11);
+        unsigned long long res = 0;
+        ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
+        printf("getuseage \n");
     }
 
     return 0;
