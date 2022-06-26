@@ -1,0 +1,13 @@
+#include "ckptinfo.h"
+
+
+int main(int argc, char **argv)
+{
+    if(argc < 1){
+        printf("parameters are not enough!\n");
+        printf("./readckpt.riscv ckptinfo.log exe\n");
+        return 0;
+    }
+    read_ckptinfo(argv[1]);
+    return 0;
+}
