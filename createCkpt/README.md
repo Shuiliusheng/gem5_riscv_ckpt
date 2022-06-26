@@ -69,11 +69,17 @@
     - 将记录的以1B为单位的first load进行合并，将其合并为以8B为单位的load指令（没有则为0）
     - 将ckpt基础信息和textrange, memrange, firstload(所有load的大小都为8B), syscallinfo写入文件中
     - 文件格式: prefix_ckpt_{startplace}.info
+        - syscall information的格式介绍：
+            - 在存储syscall信息之前会通过比较筛选出所有重复的系统调用信息，同时将每一次的系统调用通过索引(sys_indexes)将其指向所实际对应的系统调用信息位置(剔除重复信息后第几个系统调用)
+            - 首先存储系统调用发生的次数
+            - 接着存储每次系统调用对应的索引，以寻找实际系统调用的具体信息
+            - 然后存储剔除重复信息后的系统调用信息，并且重用一些位域来压缩大小
+            - 最后存储修改修改内存的所有系统调用所需要修改的地址(bufaddr)和数据
         | textinfo num              | 8      |
         |:-------------------------:|:------:|
         | textinfos(addr, size)     | num*16 |
         | sim start place           | 8      |
-        | sim inst num & warmupnum | 8      |
+        | sim inst num & warmupnum  | 8      |
         | exit inst pc              | 8      |
         | exit cause & ckptlength   | 8      |
         | start npc                 | 8      |
@@ -84,17 +90,13 @@
         | first load num            | 8      |
         | load (addr, data)         | num*16 |
         | **syscall info num**      |**8**   |
+        | syscall_indexes           |sysnum*4|
         | pc                        | 8      |
-        | num                       | 8      |
+        | num & data_size           | 8      |
         | p0                        | 8      |
-        | p1                        | 8      |
-        | p2                        | 8      |
-        | hasret                    | 8      |
         | ret                       | 8      |
-        | bufaddr                   | 8      |
-        | data_offset (file offset) | 8      |
-        | data size                 | 8      |
-        |**all syscall data information**    |
+        | hasret & data_offset      | 8      |
+        |**bufaddr + syscall data** | 8+data_size|
 
 4. 创建ckpt简介信息的文件 (saveDetailInfo)
     - 文件名: prefix_infor_{startplace}.txt

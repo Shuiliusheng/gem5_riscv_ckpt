@@ -77,10 +77,7 @@
         - 代码段的所有区域都会使用mmap进行分配
         - 仅加载textinfo记录的使用到的代码区域，以4KB为单位划分
         
-    - 读取测试程序的elf文件，获取需要代码段的段地址和段大小
-        - 对段地址进行对齐，使其以4KB对齐
-        - 对段大小进行扩充，使其以4KB为单位
-        - 将扩充之后的段信息记录在 (text_seg.addr, text_seg.size) 中
+    - 根据textinfo中最大值和最小值初始化(text_seg.addr, text_seg.size)
     - 使用mmap对区域(text_seg.addr, text_seg.size)进行映射，使其可读可写可执行
     - 根据textinfo中的信息，计算文件偏移，将代码区域的数据从文件加载到对应的内存中
 
@@ -110,12 +107,11 @@
                 uint64_t size;
             }MemRangeInfo;
         ```
-    - 读取firstload的信息，并且根据地址和访问数据的大小，初始化对应地址的数据
+    - 读取firstload的信息，并且根据地址,初始化对应的数据(firstload的数据大小均为8B)
         - 需要注意：和memrange中的注意事项一样，也需要避免恢复这些数据时直接覆盖了当前的栈区，导致程序直接崩溃
         ```c
             typedef struct{
                 uint64_t addr;
-                uint64_t size;
                 uint64_t data;
             }LoadInfo;
         ```

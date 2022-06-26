@@ -36,9 +36,8 @@
         typedef struct{
             uint64_t pc;    //ecall的pc
             uint64_t num;   //系统调用号
-            uint64_t p0, p1, p2;    //系统调用参数
-            uint64_t hasret, ret;   //返回值
-            uint64_t bufaddr, data_offset, data_size; //修改的内存信息
+            uint64_t p0;    //系统调用参数
+            uint64_t data_offset, ret;   //返回值
         }SyscallInfo; //每一个系统调用包含的信息
 
 
