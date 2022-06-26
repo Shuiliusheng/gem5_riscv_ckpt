@@ -14,6 +14,14 @@ typedef struct{
     uint64_t exit_cause;
 }SimInfo;
 
+typedef struct{
+    uint64_t pc;
+    uint64_t num;
+    uint64_t p0;
+    uint64_t ret;
+    uint64_t data_offset;
+}NewSyscallInfo;
+
 uint64_t read_ckptsyscall(FILE *fp)
 {
     uint64_t filesize, allocsize, alloc_vaddr, nowplace;
@@ -27,7 +35,28 @@ uint64_t read_ckptsyscall(FILE *fp)
     
     fread((void *)alloc_vaddr, filesize, 1, fp);
     uint64_t totalcallnum = *((uint64_t *)alloc_vaddr);
-    printf("--- syscall totalcallnum: %ld ---\n", totalcallnum);
+
+    uint64_t infoaddr = alloc_vaddr + 8 + totalcallnum*4;
+    uint32_t *sysidxs = (uint32_t *)(alloc_vaddr + 8);
+    uint32_t maxidx = 0;
+    NewSyscallInfo *sinfo;
+    for(int i=0; i<totalcallnum; i++) {
+        sinfo = (NewSyscallInfo *)(infoaddr + sysidxs[i]*sizeof(NewSyscallInfo));
+        uint64_t pc = sinfo->pc;
+        uint64_t num = sinfo->num >> 32;
+        uint64_t p0 = sinfo->p0;
+        uint64_t ret = sinfo->ret;
+        uint64_t hasret = sinfo->data_offset % 256;
+        uint64_t data_size = (sinfo->num <<32) >>32;
+        uint64_t offset = sinfo->data_offset >> 8;
+        uint64_t bufaddr = 0;
+        if(offset != 0xffffffff)
+            bufaddr = *(uint64_t *)(alloc_vaddr+offset); 
+        // printf("sys %4d, pc:0x%lx, num: %3ld, p0: 0x%18lx, ret: %8ld, data_size: %6ld, bufaddr: 0x%lx\n", i, pc, num, p0, ret, data_size, bufaddr);
+
+        if(maxidx < sysidxs[i] ) maxidx = sysidxs[i];
+    }
+    printf("--- syscall num: %ld, different syscall: %d, totalsize: %d B---\n", totalcallnum, maxidx+1, filesize);
     return alloc_vaddr;
 }
 

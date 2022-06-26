@@ -1,5 +1,7 @@
 #include "ckptinfo.h"
 #include "ctrl.h"
+#include <set>
+using namespace std;
 
 typedef struct{
     uint64_t addr;
@@ -38,53 +40,32 @@ void read_ckptsyscall(FILE *fp)
     printf("--- step 5, read syscall infor and map to memory, totalcallnum: %d ---\n", runinfo->totalcallnum);
 
     //将ecall指令替换为jmp rtemp
+    SyscallInfo *sinfos = NULL;
+    uint64_t infoaddr = runinfo->syscall_info_addr + 8 + runinfo->totalcallnum*4;
+    uint32_t *sysidxs = (uint32_t *)(runinfo->syscall_info_addr + 8);
+    set<uint64_t> rep_idxs;
     for(int i=0; i<runinfo->totalcallnum; i++) {
-        SyscallInfo *sinfos = (SyscallInfo *)(runinfo->syscall_info_addr + 8 + i*sizeof(SyscallInfo));
-        *((uint32_t *)sinfos->pc) = ECall_Replace;
+        if(rep_idxs.find(sysidxs[i]) == rep_idxs.end()) {
+            sinfos = (SyscallInfo *)(infoaddr + sysidxs[i]*sizeof(SyscallInfo));
+            *((uint32_t *)sinfos->pc) = ECall_Replace;
+            rep_idxs.insert(sysidxs[i]);
+        }
     }
 }
 
 void alloc_memrange(FILE *p)
 {
-    MemRangeInfo memrange, extra;
+    MemRangeInfo memrange;
     uint64_t mrange_num=0;
     fread(&mrange_num, 8, 1, p);
     printf("--- step 3, read memory range information and do map, range num: %d ---\n", mrange_num);
-    uint64_t tsaddr = text_seg.addr, teaddr = text_seg.addr + text_seg.size;
     for(int i=0;i<mrange_num;i++){
         fread(&memrange, sizeof(MemRangeInfo), 1, p);
-        extra.size = 0;
-        extra.addr = 0;
-        uint64_t msaddr = memrange.addr, meaddr = memrange.addr + memrange.size;
-        //delete the range that covered by text segment
-        if(msaddr < tsaddr && meaddr > tsaddr) {
-            memrange.size = tsaddr - msaddr;
-            if(meaddr > teaddr) {
-                extra.addr = teaddr;
-                extra.size = meaddr - teaddr;
-            }
-        }
-        else if(msaddr >= tsaddr && msaddr <= teaddr) {
-            if(meaddr <= teaddr) 
-                memrange.size = 0;
-            else{
-                memrange.addr = teaddr;
-                memrange.size = meaddr - teaddr;
-            }
-        }
-
         if(memrange.size !=0){
             int* arr = static_cast<int*>(mmap((void *)memrange.addr, memrange.size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, 0, 0));
             if(memrange.addr != (uint64_t)arr)
                 printf("map range: (0x%lx, 0x%lx), mapped addr: 0x%lx\n", memrange.addr, memrange.addr + memrange.size, arr);
             assert(memrange.addr == (uint64_t)arr);  
-        }
-
-        if(extra.size !=0){
-            int* arr1 = static_cast<int*>(mmap((void *)extra.addr, extra.size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, 0, 0));
-            if(extra.addr != (uint64_t)arr1)
-                printf("map range: (0x%lx, 0x%lx), mapped addr: 0x%lx\n", extra.addr, extra.addr + extra.size, arr1);
-            assert(extra.addr == (uint64_t)arr1); 
         }
     }
 }
@@ -104,7 +85,7 @@ void setFistLoad(FILE *p)
 }
 
 
-void read_ckptinfo(char ckptinfo[])
+void read_ckptinfo(char ckptinfo[], int setwarmup)
 {
     uint64_t npc, mrange_num=0, loadnum = 0, temp=0;
     MemRangeInfo memrange, extra;
@@ -179,16 +160,26 @@ void read_ckptinfo(char ckptinfo[])
     runinfo->lastinsts = __csrr_instret();
     runinfo->startcycles = __csrr_cycle();
     runinfo->startinsts = __csrr_instret();
-    if(runLength != 0){
-        printf("maxinst: %ld, warmup %ld\n", runLength, warmup);
-        init_start(runLength, warmup);
+    if(setwarmup!=0) {
+        uint64_t total = runLength + warmup;
+        if(runLength == 0)
+            total = siminfo.simNum;
+        printf("maxinst: %ld, warmup %ld\n", total-setwarmup, setwarmup);
+        init_start(total-setwarmup, setwarmup);
     }
     else {
-        warmup = siminfo.simNum/20;
-        runLength = siminfo.simNum - warmup;
-        printf("maxinst: %ld, warmup %ld\n", runLength, warmup);
-        init_start(runLength, warmup);
+        if(runLength != 0){
+            printf("maxinst: %ld, warmup %ld\n", runLength, warmup);
+            init_start(runLength, warmup);
+        }
+        else {
+            warmup = siminfo.simNum/20;
+            runLength = siminfo.simNum - warmup;
+            printf("maxinst: %ld, warmup %ld\n", runLength, warmup);
+            init_start(runLength, warmup);
+        }
     }
+    
     //step8: set the testing program's register information
     Context_Operation("fld f", StoreFpRegAddr);
     Context_Operation("ld x", StoreIntRegAddr);

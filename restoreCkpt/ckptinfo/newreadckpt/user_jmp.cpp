@@ -1,5 +1,7 @@
 #include "ckptinfo.h"
 #include <vector>
+#include <set>
+#include <map>
 using namespace std;
 
 void initMidJmpPlace()
@@ -51,13 +53,13 @@ void getRangeInfo(char filename[]) {
         ranges.push_back(range);
     }
 
-    uint64_t offset = (8+num*16) + 5*8 + 64*8;
-    fseek(p, offset, SEEK_SET);
-    fread(&num, 8, 1, p);
-    for(int i=0;i<num;i++){
-        fread(&range, sizeof(MemRangeInfo), 1, p);
-        ranges.push_back(range);
-    }
+    // uint64_t offset = (8+num*16) + 5*8 + 64*8;
+    // fseek(p, offset, SEEK_SET);
+    // fread(&num, 8, 1, p);
+    // for(int i=0;i<num;i++){
+    //     fread(&range, sizeof(MemRangeInfo), 1, p);
+    //     ranges.push_back(range);
+    // }
     fclose(p);
 
     for(int i=1;i<ranges.size();i++){
@@ -110,7 +112,15 @@ void replaceSyscall(vector<uint64_t> &pcs)
         setJmp(midpoints[i]+4, midpoints[i-1]+4);
     }
 
+    set<uint64_t> already_set;
     for(int i=1; i<pcs.size(); i++) {
+        if(i != pcs.size()-1) {
+            if(already_set.find(pcs[i]) != already_set.end()){
+                continue;
+            }
+            already_set.insert(pcs[i]);
+        }
+
         for(int c=0;c<midpoints.size();c++){
             if(pcs[i] - (midpoints[c]+4) < MaxJALOffset){
                 if(i == pcs.size()-1)
@@ -123,12 +133,21 @@ void replaceSyscall(vector<uint64_t> &pcs)
     asm volatile("fence.i  ");
 }
 
+
 void produceSysRet(vector<uint64_t> &pcs)
 {
     //set jmp to syscall ret place
     RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
     JmpRepInfo *infos = (JmpRepInfo *)malloc(sizeof(JmpRepInfo) * pcs.size());
+    map<uint64_t, int> jals;
+
     for(int i=0; i<pcs.size(); i++) {
+        uint64_t jalpc = pcs[i]+4;
+        if(jals.find(jalpc)!=jals.end()) {
+            infos[i] = infos[jals[jalpc]];
+            continue;
+        }
+        jals[jalpc] = i;
         int max = 0;
         for(max = 0; max < midpoints.size(); max++){
             if(pcs[i]+4 - midpoints[max] < MaxJALOffset) {
@@ -154,19 +173,22 @@ void produceJmpInst(uint64_t npc)
 
     RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
     SyscallInfo *sinfos = NULL;
+    uint64_t infoaddr = runinfo->syscall_info_addr + 8 + runinfo->totalcallnum*4;
+    uint32_t *sysidxs = (uint32_t *)(runinfo->syscall_info_addr + 8);
+    uint64_t maxtarget = 0;
     for(int i=0; i<runinfo->totalcallnum; i++) {
-        sinfos = (SyscallInfo *)(runinfo->syscall_info_addr + 8 + i*sizeof(SyscallInfo));
+        sinfos = (SyscallInfo *)(infoaddr + sysidxs[i]*sizeof(SyscallInfo));
+        if(maxtarget < sinfos->pc) maxtarget = sinfos->pc;
         pcs.push_back(sinfos->pc);
     }
     pcs.push_back(runinfo->exitpc);
+    if(maxtarget < runinfo->exitpc) maxtarget = runinfo->exitpc;
 
-    uint64_t maxtarget = 0;
-    for(int i=0;i<pcs.size();i++){
-        if(maxtarget < pcs[i]) maxtarget = pcs[i];
-    }
     midpoints.push_back(TPoint2);
 
     findMidPoints(TPoint2, maxtarget);
+    printf("midpoint num: %d\n", midpoints.size());
+    
     replaceSyscall(pcs);
     produceSysRet(pcs);
     setJmp(TPoint1, TPoint2);

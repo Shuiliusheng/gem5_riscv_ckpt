@@ -27,9 +27,9 @@ typedef struct{
 typedef struct{
     uint64_t pc;
     uint64_t num;
-    uint64_t p0, p1, p2;
-    uint64_t hasret, ret;
-    uint64_t bufaddr, data_offset, data_size;
+    uint64_t p0;
+    uint64_t ret;
+    uint64_t data_offset;
 }SyscallInfo;
 
 typedef struct{

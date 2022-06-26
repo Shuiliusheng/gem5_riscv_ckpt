@@ -15,10 +15,6 @@ void takeoverSyscall()
     insts = __csrr_instret();
     runinfo->cycles += (cycles - runinfo->lastcycles);
     runinfo->insts += (insts - runinfo->lastinsts);
-
-    uint64_t saddr = runinfo->syscall_info_addr;
-    SyscallInfo *infos = (SyscallInfo *)(saddr+8+runinfo->nowcallnum * sizeof(SyscallInfo));
-    runinfo->intregs[10] = infos->p0;
     
     if (runinfo->nowcallnum >= runinfo->totalcallnum){
         printf("syscall is overflow, exit.\n");
@@ -27,40 +23,33 @@ void takeoverSyscall()
         exit(0);
     }
 
-    if(runinfo->intregs[17] != infos->num){
-        printf("syscall num is wrong! callnum: 0x%lx, recorded num: 0x%lx, 0x%lx\n", runinfo->intregs[17], infos->pc, infos->num);
+    uint64_t infoaddr = runinfo->syscall_info_addr + 8 + runinfo->totalcallnum*4;
+    uint32_t *sysidxs = (uint32_t *)(runinfo->syscall_info_addr + 8);
+    SyscallInfo *infos = (SyscallInfo *)(infoaddr + sysidxs[runinfo->nowcallnum]*sizeof(SyscallInfo));
+    runinfo->intregs[10] = infos->p0;
+
+    uint64_t sysnum = infos->num >> 32;
+    // printf("syscall %d: %d\n", runinfo->nowcallnum, sysnum);
+    if(runinfo->intregs[17] != sysnum){
+        printf("syscall num is wrong! callnum: 0x%lx, recorded num: 0x%lx, 0x%lx\n", runinfo->intregs[17], infos->pc, sysnum);
         exit(0);
     }
 
     //this syscall has data to process
-    if (infos->data_offset != 0xffffffff){
-        if (infos->num == 0x3f) {    //read
-            unsigned char *data = (unsigned char *)(saddr + infos->data_offset);
-            unsigned char *dst = (unsigned char *)runinfo->intregs[11];
-            for(int c=0;c<infos->data_size;c++){
-                dst[c] = data[c];
-            }
-        }
-        else if(infos->num == 0x40) { //write
-            char *dst = (char *)runinfo->intregs[11];
-            if(runinfo->intregs[10] == 1){
-                char t = dst[runinfo->intregs[12]-1];
-                dst[runinfo->intregs[12]-1]='\0';
-                printf("%s", (char *)dst);
-                dst[runinfo->intregs[12]-1] = t;
-                printf("\n");
-            }
-        }
-        else if(infos->bufaddr != 0) {   //these syscall also need to write data to bufaddr
-            unsigned char *dst = (unsigned char *)infos->bufaddr;
-            unsigned char *data = (unsigned char *)(saddr + infos->data_offset);
-            for(int c=0;c<infos->data_size;c++){
+    uint64_t data_offset = infos->data_offset >> 8;
+    if (data_offset != 0xffffffff){
+        uint64_t data_size = (infos->num<<32) >> 32;
+        uint64_t bufaddr = *(uint64_t *)(runinfo->syscall_info_addr + data_offset);
+        if(bufaddr != 0) {   //these syscall also need to write data to bufaddr
+            unsigned char *dst = (unsigned char *)bufaddr;
+            unsigned char *data = (unsigned char *)(runinfo->syscall_info_addr + data_offset + 8);
+            for(int c=0;c<data_size;c++){
                 dst[c] = data[c];
             }
         }
     }
-    if(infos->hasret) {
-        //modified the ret value
+    uint64_t hasret = infos->data_offset % 256;
+    if(hasret) {
         runinfo->intregs[10] = infos->ret;
     }
 

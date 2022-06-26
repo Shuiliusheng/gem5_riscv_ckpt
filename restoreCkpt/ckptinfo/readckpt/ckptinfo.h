@@ -17,9 +17,9 @@ typedef struct{
 typedef struct{
     uint64_t pc;
     uint64_t num;
-    uint64_t p0, p1, p2;
-    uint64_t hasret, ret;
-    uint64_t bufaddr, data_offset, data_size;
+    uint64_t p0;
+    uint64_t ret;
+    uint64_t data_offset;
 }SyscallInfo;
 
 typedef struct{
@@ -55,7 +55,7 @@ extern MemRangeInfo text_seg;
 
 void takeoverSyscall();
 uint64_t loadelf(char * progname, char *ckptinfo);
-void read_ckptinfo(char ckptinfo[]);
+void read_ckptinfo(char ckptinfo[], int setwarmup);
 
 //读写临时寄存器 + 跳转临时寄存器
 #define WriteRTemp(srcreg, rtempnum) "ori x0, " srcreg ", 8+" #rtempnum " \n\t"

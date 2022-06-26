@@ -60,7 +60,6 @@ uint64_t loadelf(char * progname, char *ckptinfo)
 {
 	Elf64_Ehdr ehdr;
 	Elf64_Phdr phdr;
-    uint64_t startvaddr = 0;
     uint64_t cycles[2], insts[2];
     cycles[0] = __csrr_cycle();
     insts[0] = __csrr_instret();
@@ -70,48 +69,44 @@ uint64_t loadelf(char * progname, char *ckptinfo)
 		printf("cannot open %s\n", ckptinfo);
         exit(1);
 	}
+    uint64_t numinfos = 0;
+    fread(&numinfos, 8, 1, fp1);
+    printf("textinfo: %d\n", numinfos);
+    MemRangeInfo *textinfo = (MemRangeInfo *)RunningInfoAddr;
+    fread(&textinfo[0], sizeof(MemRangeInfo), numinfos, fp1);
+    fclose(fp1);
+
+    text_seg.addr = textinfo[0].addr;
+    text_seg.size = textinfo[numinfos-1].addr + textinfo[numinfos-1].size + 4096 - textinfo[0].addr;
+
+    uint64_t alloc_vaddr = (uint64_t)mmap((void*)text_seg.addr, text_seg.size, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANON, -1, 0);
+    printf("--- load elf: alloc text memory: (0x%lx, 0x%lx) ---\n", alloc_vaddr, alloc_vaddr + text_seg.size);	
+    if(alloc_vaddr != text_seg.addr){
+        printf("alloc text range failed\n");	
+        exit(1);
+    }
+
 	FILE *fp = fopen(progname, "rb");
 	if (fp == 0) {
 		printf("cannot open %s\n", progname);
         exit(1);
 	}
-
-    MemRangeInfo textinfo;
-    uint64_t numinfos = 0;
-    fread(&numinfos, 8, 1, fp1);
     fread(&ehdr, sizeof(ehdr), 1, fp);
-    printf("textinfo: %d\n", numinfos);
-
 	for(int i=0; i<ehdr.e_phnum; i++) 
     {
 		fseek(fp, ehdr.e_phoff + i * ehdr.e_phentsize, SEEK_SET);
 		fread(&phdr, sizeof(phdr), 1, fp);
         //PT_LOAD 1
         if(phdr.p_type == 1 && phdr.p_memsz && phdr.p_filesz > 0){
-            uint64_t prepad = phdr.p_vaddr % 4096; 
-            uint64_t vaddr = phdr.p_vaddr - prepad;
-            uint64_t postpad = 4096 - (phdr.p_vaddr + phdr.p_memsz) % 4096;
-            uint64_t pmemsz = (phdr.p_vaddr + phdr.p_memsz + postpad) - vaddr;
             int prot = get_prot(phdr.p_flags);
             if(!(prot & PROT_EXEC)) {
                 continue;
             }	
-            
-            text_seg.addr = vaddr;
-            text_seg.size = pmemsz;
-
-            uint64_t alloc_vaddr = (uint64_t)mmap((void*)vaddr, pmemsz, prot | PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANON, -1, 0);
-            printf("--- load elf: alloc text memory: (0x%lx, 0x%lx) ---\n", alloc_vaddr, alloc_vaddr + pmemsz);	
-            if(alloc_vaddr != vaddr){
-                printf("required vaddr: 0x%lx, alloc vaddr: 0x%lx\n", vaddr, alloc_vaddr);	
-                exit(1);
-            }
                 
             //仅加载被使用到的代码段
             for(int i=0;i<numinfos;i++){
-                fread(&textinfo, sizeof(MemRangeInfo), 1, fp1);
-                fseek(fp, textinfo.addr - phdr.p_vaddr + phdr.p_offset, SEEK_SET);
-                fread((char *)textinfo.addr, textinfo.size, 1, fp); 
+                fseek(fp, textinfo[i].addr - phdr.p_vaddr + phdr.p_offset, SEEK_SET);
+                fread((char *)textinfo[i].addr, textinfo[i].size, 1, fp); 
             }
 
             if(numinfos==0) {
@@ -130,14 +125,12 @@ uint64_t loadelf(char * progname, char *ckptinfo)
                     }
                 }
             }
-            
+            break;
         }
 	}
     fclose(fp);
-    fclose(fp1);
     cycles[1] = __csrr_cycle();
     insts[1] = __csrr_instret();
-
     printf("load elf running info, cycles: %ld, insts: %ld\n", cycles[1]-cycles[0], insts[1]-insts[0]);
-    return startvaddr;
+    return 0;
 }

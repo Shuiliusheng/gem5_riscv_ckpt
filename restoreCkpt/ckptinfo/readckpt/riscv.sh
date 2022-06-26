@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cc=riscv64-unknown-linux-gnu-gcc
+cc=riscv64-unknown-linux-gnu-g++
 objdump=riscv64-unknown-linux-gnu-objdump
 flags="-static -O2"
 dflags=""

@@ -16,6 +16,12 @@ int main(int argc, char **argv)
     }
     printf("stack addr: 0x%lx\n", &alloc_vaddr);
     loadelf(argv[2], argv[1]);
-    read_ckptinfo(argv[1]);
+
+    int setwarmup = 0;
+    printf("argc: %d\n", argc);
+    if(argc == 4) {
+        sscanf(argv[3], "%d", &setwarmup);
+    }
+    read_ckptinfo(argv[1], setwarmup);
     return 0;
 }

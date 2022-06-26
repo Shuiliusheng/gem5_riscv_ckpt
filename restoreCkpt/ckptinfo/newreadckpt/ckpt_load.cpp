@@ -2,9 +2,11 @@
 
 typedef struct{
     uint64_t addr;
-    uint64_t size;
     uint64_t data;
 }LoadInfo;
+//    uint64_t size;
+//first load默认是8B
+
 
 typedef struct{
     uint64_t start;
@@ -37,46 +39,17 @@ void read_ckptsyscall(FILE *fp)
 
 void alloc_memrange(FILE *p)
 {
-    MemRangeInfo memrange, extra;
+    MemRangeInfo memrange;
     uint64_t mrange_num=0;
     fread(&mrange_num, 8, 1, p);
     printf("--- step 3, read memory range information and do map, range num: %d ---\n", mrange_num);
-    uint64_t tsaddr = text_seg.addr, teaddr = text_seg.addr + text_seg.size;
     for(int i=0;i<mrange_num;i++){
         fread(&memrange, sizeof(MemRangeInfo), 1, p);
-        printf("load range: %d\r", i);
-        extra.size = 0;
-        extra.addr = 0;
-        uint64_t msaddr = memrange.addr, meaddr = memrange.addr + memrange.size;
-        //delete the range that covered by text segment
-        if(msaddr < tsaddr && meaddr > tsaddr) {
-            memrange.size = tsaddr - msaddr;
-            if(meaddr > teaddr) {
-                extra.addr = teaddr;
-                extra.size = meaddr - teaddr;
-            }
-        }
-        else if(msaddr >= tsaddr && msaddr <= teaddr) {
-            if(meaddr <= teaddr) 
-                memrange.size = 0;
-            else{
-                memrange.addr = teaddr;
-                memrange.size = meaddr - teaddr;
-            }
-        }
-
         if(memrange.size !=0){
             int* arr = static_cast<int*>(mmap((void *)memrange.addr, memrange.size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, 0, 0));
             if(memrange.addr != (uint64_t)arr)
                 printf("map range: (0x%lx, 0x%lx), mapped addr: 0x%lx\n", memrange.addr, memrange.addr + memrange.size, arr);
             assert(memrange.addr == (uint64_t)arr);  
-        }
-
-        if(extra.size !=0){
-            int* arr1 = static_cast<int*>(mmap((void *)extra.addr, extra.size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, 0, 0));
-            if(extra.addr != (uint64_t)arr1)
-                printf("map range: (0x%lx, 0x%lx), mapped addr: 0x%lx\n", extra.addr, extra.addr + extra.size, arr1);
-            assert(extra.addr == (uint64_t)arr1); 
         }
     }
 }
@@ -89,13 +62,8 @@ void setFistLoad(FILE *p)
     LoadInfo *linfos = (LoadInfo *)malloc(sizeof(LoadInfo)*loadnum);
     fread(&linfos[0], sizeof(LoadInfo), loadnum, p);
     for(int j=0;j<loadnum;j++){
-        // printf("load %d, addr: 0x%lx, size: %d, data: 0x%lx\n", j, linfos[j].addr, linfos[j].size, linfos[j].data);
-        switch(linfos[j].size) {
-            case 1: *((uint8_t *)linfos[j].addr) = (uint8_t)linfos[j].data; break;
-            case 2: *((uint16_t *)linfos[j].addr) = (uint16_t)linfos[j].data; break;
-            case 4: *((uint32_t *)linfos[j].addr) = (uint32_t)linfos[j].data; break;
-            case 8: *((uint64_t *)linfos[j].addr) = linfos[j].data; break;
-        }
+        // printf("load %d, addr: 0x%lx, data: 0x%lx\n", j, linfos[j].addr, linfos[j].data);
+        *((uint64_t *)linfos[j].addr) = linfos[j].data;
     }
     free(linfos);
 }
@@ -162,6 +130,7 @@ void read_ckptinfo(char ckptinfo[])
     //step7: save registers data of boot program 
     printf("--- step n, save registers data of loader, set testing program registers, start testing ---\n");
     Context_Operation("sd x", OldIntRegAddr);
+    Context_Operation("fld f", StoreFpRegAddr);
 
     runinfo->cycles = 0;
     runinfo->insts = 0;
@@ -169,9 +138,9 @@ void read_ckptinfo(char ckptinfo[])
     runinfo->lastinsts = __csrr_instret();
     runinfo->startcycles = __csrr_cycle();
     runinfo->startinsts = __csrr_instret();
+    
 
     //step8: set the testing program's register information
-    Context_Operation("fld f", StoreFpRegAddr);
     Context_Operation("ld x", StoreIntRegAddr);
 
     StartJump();
