@@ -239,7 +239,7 @@ void CkptInfo::showSysInfo()
 void CkptInfo::saveDetailInfo()
 {
   char dstname[300];
-  sprintf(dstname, "%s_infor_%ld.txt", this->filename, this->startnum + this->warmup);
+  sprintf(dstname, "%s_infor_%ld_len_%d_warmup_%d.txt", this->filename, this->startnum + this->warmup, length, warmup);
 
   FILE *p=NULL;
   p = fopen(dstname, "w");
@@ -280,7 +280,7 @@ void CkptInfo::saveDetailInfo()
 void CkptInfo::saveCkptInfo()
 {
   char dstname[300];
-  sprintf(dstname, "%s_ckpt_%ld.info", this->filename, this->startnum + this->warmup);
+  sprintf(dstname, "%s_ckpt_%ld_len_%d_warmup_%d.info", this->filename, this->startnum + this->warmup, length, warmup);
 
   FILE *p=NULL;
   p = fopen(dstname, "wb");
