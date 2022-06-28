@@ -5,6 +5,7 @@ CkptSettings ckptsettings;
 int ckptidx = 0;
 bool needCreateCkpt = false;
 bool readCkptSetting = false;
+uint64_t ckptstartnum = 0;
 
 bool cmp(CkptCtrl &ctrl1, CkptCtrl &ctrl2) { 
   return ctrl1.start < ctrl2.start; 
@@ -36,12 +37,12 @@ void init_ckpt_settings(const char filename[])
       continue;
     }
     if(temp.find("mmapend") != temp.npos) {
-      sscanf(&str[idx+1], "%lld", &v1);
+      sscanf(&str[idx+1], "%llx", &v1);
       printf("mmapend: 0x%lx\n", v1);
       ckptsettings.mmapend = v1;
     }
     else if(temp.find("stacktop") != temp.npos) {
-      sscanf(&str[idx+1], "%lld", &v1);
+      sscanf(&str[idx+1], "%llx", &v1);
       printf("stacktop: 0x%lx\n", v1);
       ckptsettings.stack_base = v1;
     }
@@ -182,6 +183,9 @@ void initCkptSysInfo(char *filename)
   }
   uint64_t numtext = 0, nummem = 0, numloads = 0, offset = 0;
   fread(&numtext, sizeof(uint64_t), 1, p);
+
+  fseek(p, 8+numtext*16, SEEK_SET);
+  fread(&ckptstartnum, sizeof(uint64_t), 1, p);
   
   offset = 8 + numtext*16 + 5*8 + 64*8;
   fseek(p, offset, SEEK_SET);

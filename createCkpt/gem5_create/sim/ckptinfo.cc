@@ -1,4 +1,5 @@
 #include "sim/ckptinfo.hh"
+#include "sim/ckpt_collect.hh"
 
 void CkptInfo::addload(uint64_t addr, uint8_t *data, unsigned char size) 
 {
@@ -239,7 +240,10 @@ void CkptInfo::showSysInfo()
 void CkptInfo::saveDetailInfo()
 {
   char dstname[300];
-  sprintf(dstname, "%s_infor_%ld_len_%d_warmup_%d.txt", this->filename, this->startnum + this->warmup, length, warmup);
+  if(readCkptSetting)
+    sprintf(dstname, "%s_ninfor_%ld_len_%d_warmup_%d.txt", this->filename, ckptstartnum + this->startnum + this->warmup, length, warmup);
+  else
+    sprintf(dstname, "%s_infor_%ld_len_%d_warmup_%d.txt", this->filename, this->startnum + this->warmup, length, warmup);
 
   FILE *p=NULL;
   p = fopen(dstname, "w");
@@ -280,7 +284,10 @@ void CkptInfo::saveDetailInfo()
 void CkptInfo::saveCkptInfo()
 {
   char dstname[300];
-  sprintf(dstname, "%s_ckpt_%ld_len_%d_warmup_%d.info", this->filename, this->startnum + this->warmup, length, warmup);
+  if(readCkptSetting)
+    sprintf(dstname, "%s_nckpt_%ld_len_%d_warmup_%d.info", this->filename, ckptstartnum + this->startnum + this->warmup, length, warmup);
+  else
+    sprintf(dstname, "%s_ckpt_%ld_len_%d_warmup_%d.info", this->filename, this->startnum + this->warmup, length, warmup);
 
   FILE *p=NULL;
   p = fopen(dstname, "wb");
