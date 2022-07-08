@@ -6,6 +6,7 @@ int ckptidx = 0;
 bool needCreateCkpt = false;
 bool readCkptSetting = false;
 uint64_t ckptstartnum = 0;
+bool strictLength = false;
 
 bool cmp(CkptCtrl &ctrl1, CkptCtrl &ctrl2) { 
   return ctrl1.start < ctrl2.start; 
@@ -22,10 +23,10 @@ void init_ckpt_settings(const char filename[])
     return ;
   }
 
-  char str[100];
+  char str[300];
   uint64_t v1, v2, v3, v4;
   while(!feof(p)) {
-    fgets(str, 100, p);
+    fgets(str, 300, p);
     if(strlen(str) < 1) break;
     str[strlen(str)-1] = '\0';
 
@@ -38,18 +39,18 @@ void init_ckpt_settings(const char filename[])
     }
     if(temp.find("mmapend") != temp.npos) {
       sscanf(&str[idx+1], "%llx", &v1);
-      printf("mmapend: 0x%lx\n", v1);
+      printf("xmmapend: 0x%lx\n", v1);
       ckptsettings.mmapend = v1;
     }
     else if(temp.find("stacktop") != temp.npos) {
       sscanf(&str[idx+1], "%llx", &v1);
-      printf("stacktop: 0x%lx\n", v1);
+      printf("xstacktop: 0x%lx\n", v1);
       ckptsettings.stack_base = v1;
     }
     else if(temp.find("ckptprefix") != temp.npos) {
       idx = idx + 1;
       for(; idx<strlen(str) && str[idx] ==' '; idx++);
-      printf("benchname: %s\n", &str[idx]);
+      printf("xbenchname: %s\n", &str[idx]);
       strcpy(ckptsettings.benchname,  &str[idx]);
     }
     else if(temp.find("ckptctrl") != temp.npos) {
@@ -62,6 +63,10 @@ void init_ckpt_settings(const char filename[])
         ckptsettings.ctrls.push_back(ctrl);
       }
     }
+    else if(temp.find("strictLength") != temp.npos) {
+      strictLength = true;
+      printf("enable strict sim length!\n");
+    }
     else if(temp.find("readckpt") != temp.npos) {
       idx = idx + 1;
       for(; idx<strlen(str) && str[idx] ==' '; idx++);
@@ -70,7 +75,7 @@ void init_ckpt_settings(const char filename[])
       readCkptSetting = true;
     }
     else{
-      printf("%s", str);
+      printf("useless: %s\n", str);
     }
     strcpy(str, "");
   }
@@ -134,39 +139,44 @@ void ckpt_detectOver(uint64_t exit_place, uint64_t exit_pc, uint64_t instinfo[])
 {
   for (vector<CkptInfo *>::iterator it = pendingCkpts.begin(); it != pendingCkpts.end();) {
     if ((*it)->detectOver(exit_place, exit_pc, instinfo)) {
-      printf("exit ckpt start with: %d\n", (*it)->startnum);
+      printf("exit ckpt start with: %llu\n", (*it)->startnum);
       delete *it;
       it = pendingCkpts.erase(it);
     } else {
       ++it;
     }
   }
+  printf("%d %d %d\n", pendingCkpts.size(), ckptidx, ckptsettings.ctrls.size());
+  if(pendingCkpts.size() == 0 && ckptidx == ckptsettings.ctrls.size()){
+    printf("all ckpts are created.\n");
+    exit(0);
+  }
 }
 
 bool hasValidCkpt() 
 {
-    if(pendingCkpts.size()!= 0) {
-        return true;
-    }
-    else{
-        return false;
-    }
+  if(pendingCkpts.size()!= 0) {
+    return true;
+  }
+  else{
+    return false;
+  }
 }
 
 bool isCkptStart(uint64_t simNum, uint64_t &length)
 {
-    if(ckptidx >= ckptsettings.ctrls.size()) {
-        return false;
-    }
+  if(ckptidx >= ckptsettings.ctrls.size()) {
+    return false;
+  }
 
-    if(simNum == ckptsettings.ctrls[ckptidx].start) {
-        length = ckptsettings.ctrls[ckptidx].end - ckptsettings.ctrls[ckptidx].start;
-        ckptidx++;
-        return true;
-    }
-    else{
-        return false;
-    }
+  if(simNum == ckptsettings.ctrls[ckptidx].start) {
+    length = ckptsettings.ctrls[ckptidx].end - ckptsettings.ctrls[ckptidx].start;
+    ckptidx++;
+    return true;
+  }
+  else{
+    return false;
+  }
 }
 
 uint64_t syscall_info_addr = 0;

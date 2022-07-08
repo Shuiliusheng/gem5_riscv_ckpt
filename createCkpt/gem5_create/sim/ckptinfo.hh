@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <map>
 #include <stdio.h>
 #include <string.h>
 #include <algorithm>
@@ -56,6 +57,9 @@ class SyscallInfo{
     }
 };
 
+#define AccessRange 8192
+#define AccessRangeBits 13
+
 class CkptInfo{
   public:
     char filename[300];
@@ -67,7 +71,7 @@ class CkptInfo{
     vector<CodeRange> memrange;
     vector<CodeRange> textrange;
     vector<SyscallInfo> sysinfos;
-    set<uint64_t> preAccess;
+    map<uint64_t, uint8_t *> preAccess;
     set<uint64_t> textAccess;
 
     CkptInfo(uint64_t startnum, uint64_t length, uint64_t warmup, uint64_t intregs[], uint64_t fpregs[], uint64_t pc, uint64_t npc, char filename[], uint64_t instinfo[]){
@@ -110,6 +114,8 @@ class CkptInfo{
     }
 
   public:
+    void addAddrInfo(uint64_t addr, uint8_t size, uint8_t exist[]);
+
     static bool cmp(LoadInfo &info1, LoadInfo &info2) { return info1.addr < info2.addr; }
     void addload(uint64_t addr, uint8_t *data, unsigned char size);
     void addstore(uint64_t addr, unsigned char size);
@@ -122,6 +128,7 @@ class CkptInfo{
     void combine_loads(vector<LoadInfo> &temploads);
     void getFistloads();
     uint64_t getRange(set<uint64_t> &addrs, vector<CodeRange> &ranges);
+    uint64_t getRange(map<uint64_t, uint8_t *> &addrs, vector<CodeRange> &ranges);
     
     bool detectOver(uint64_t exit_place, uint64_t exit_pc, uint64_t instinfo[]);
     void showCkptInfo();

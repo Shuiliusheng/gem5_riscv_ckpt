@@ -438,6 +438,10 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t *data, unsigned size,
             return fault;
         }
 
+        // if(thread->pcState().pc() > 0x200000) {
+        //     printf("load 0x%lx, addr: 0x%lx\n", thread->pcState().pc(), addr);
+        // }
+
         /*
          * Set up for accessing the next cache line.
          */
@@ -468,6 +472,9 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
     // if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt) && startlog) { 
         ckpt_addstore(addr, size);
     }
+    // if(thread->pcState().pc() > 0x200000) {
+    //     printf("store 0x%lx, addr: 0x%lx\n", thread->pcState().pc(), addr);
+    // }
 
     // use the CPU's statically allocated write request and packet objects
     const RequestPtr &req = data_write_req;
@@ -717,6 +724,9 @@ AtomicSimpleCPU::tick()
                     else
                         printf("----- simInsts: %ld \n", t_info.numInst);
                 }
+                // if(benchinsts>0) {
+                //     printf("benchinst: %ld, 0x%lx\n", benchinsts, thread->pcState().pc());
+                // }
 
                 fault = curStaticInst->execute(&t_info, traceData);
 
@@ -776,20 +786,21 @@ AtomicSimpleCPU::tick()
                     }
 
                     if(startlog) {
-                        if(numInst >= pendingCkpts[0]->startnum + pendingCkpts[0]->length) {
-                            if(!curStaticInst->isCompressed && !curStaticInst->isSyscall()) {
-                                bool isInPre = preinsts.find(nowpc) != preinsts.end();
-                                if(!isInPre){
-                                    printf("***** ckptExitInst, inst_num: %ld, pc: 0x%lx\n", t_info.numInst, nowpc);
-                                    ckpt_detectOver(numInst, nowpc, instnums);
-                                    if(pendingCkpts.size() == 0 && ckptidx == ckptsettings.ctrls.size() && ckptsettings.ctrls.size()!=0){
-                                        printf("all ckpts are created.\n");
-                                        exit(0);
-                                    }
-                                } 
+                        if(numInst > pendingCkpts[0]->startnum + pendingCkpts[0]->length) {
+                            if(strictLength) {
+                                ckpt_detectOver(numInst, 0, instnums);
+                            }
+                            else{
+                                if(!curStaticInst->isCompressed && !curStaticInst->isSyscall()) {
+                                    bool isInPre = preinsts.find(nowpc) != preinsts.end();
+                                    if(!isInPre){
+                                        printf("***** ckptExitInst, inst_num: %ld, pc: 0x%lx\n", t_info.numInst, nowpc);
+                                        ckpt_detectOver(numInst, nowpc, instnums);
+                                    } 
+                                }
                             }
                         }
-                        if(!curStaticInst->isCompressed) {
+                        if(!curStaticInst->isCompressed && !strictLength) {
                             preinsts.insert(nowpc);
                         }
                     }

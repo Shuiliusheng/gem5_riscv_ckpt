@@ -1,18 +1,70 @@
 #include "sim/ckptinfo.hh"
 #include "sim/ckpt_collect.hh"
+#include <malloc.h>
+
+void CkptInfo::addAddrInfo(uint64_t addr, uint8_t size, uint8_t exist[])
+{
+  uint64_t base = (addr >> AccessRangeBits) << AccessRangeBits;
+  uint8_t len1 = size, len2 = 0;
+  uint64_t addr1 = base + AccessRange;
+  if(addr + size -1 >= addr1) {
+    len2 = addr + size - addr1; 
+    len1 = size - len2;
+  }
+
+  map<uint64_t, uint8_t *>::iterator it = preAccess.find(base);
+  if(it == preAccess.end()) {
+    uint8_t *data = (uint8_t *)malloc(AccessRange);
+    memset(data, 0, AccessRange);
+    int idx = addr - base;
+    for(int i=0;i<len1;i++,idx++) {
+      exist[i] = 0;
+      data[idx] = 1;
+    }
+    preAccess[base] = data;
+  }
+  else {
+    uint8_t *data = it->second;
+    int idx = addr - base;
+    for(int i=0;i<len1;i++,idx++) {
+      exist[i] = data[idx];
+      data[idx] = 1;
+    }
+  }
+
+  if(len2!=0) {
+    it = preAccess.find(addr1);
+    if(it == preAccess.end()) {
+      uint8_t *data = (uint8_t *)malloc(AccessRange);
+      memset(data, 0, AccessRange);
+      for(int i=0;i<len2;i++) {
+        exist[i+len1] = 0;
+        data[i] = 1;
+      }
+      preAccess[addr1] = data;
+    }
+    else {
+      uint8_t *data = it->second;
+      for(int i=0;i<len1;i++) {
+        exist[i+len1] = data[i];
+        data[i] = 1;
+      }
+    }
+  }
+}
 
 void CkptInfo::addload(uint64_t addr, uint8_t *data, unsigned char size) 
 {
   uint8_t isFirst = 0;
-  uint64_t ta = addr + size - 1;
   LoadInfo info;
-  for(int i=size-1; i>=0; i--,ta--) {
+  uint8_t exist[8];
+  addAddrInfo(addr, size, exist);
+  for(int i=size-1; i>=0; i--) {
     isFirst = isFirst << 1;
-    if(this->preAccess.find(ta) == this->preAccess.end()) {
+    if(exist[i]==0) {
       isFirst = isFirst + 1;
       info.data[i] = data[i];
     }
-    this->preAccess.insert(ta);
   }
 
   if(isFirst != 0) {
@@ -25,16 +77,16 @@ void CkptInfo::addload(uint64_t addr, uint8_t *data, unsigned char size)
 
 void CkptInfo::addstore(uint64_t addr, unsigned char size) 
 {
-  for(int i=0; i<size; i++,addr++){
-    this->preAccess.insert(addr);
-  }
+  uint8_t exist[8];
+  addAddrInfo(addr, size, exist);
 }
 
 void CkptInfo::addinst(uint64_t addr) 
 {
-  for(int i=0; i<4; i++,addr++){
-    this->textAccess.insert(addr);
-  }
+  uint64_t t1 = (addr >> 12) << 12;
+  this->textAccess.insert(addr);
+  if(t1+4096 < addr+4)
+    this->textAccess.insert(addr+4096);
 }
 
 
@@ -127,7 +179,11 @@ void CkptInfo::getFistloads()
     }
   }
   this->loads.clear();
+  vector<LoadInfo>().swap(this->loads);
+
   combine_loads(temploads);
+  temploads.clear();
+  vector<LoadInfo>().swap(temploads);
 }
 
 uint64_t CkptInfo::getRange(set<uint64_t> &addrs, vector<CodeRange> &ranges) 
@@ -161,6 +217,38 @@ uint64_t CkptInfo::getRange(set<uint64_t> &addrs, vector<CodeRange> &ranges)
   return totalsize;
 }
 
+uint64_t CkptInfo::getRange(map<uint64_t, uint8_t *> &addrs, vector<CodeRange> &ranges) 
+{
+  map<uint64_t, uint8_t *>::iterator iter = addrs.begin();
+  uint64_t eaddr = 0;
+  int64_t len = 0;
+  uint64_t totalsize = 0;
+  CodeRange r;
+  r.addr = ((iter->first) >> 12) << 12;
+  r.size = AccessRange;
+  eaddr = r.addr + r.size;
+
+  for(iter = addrs.begin() ; iter != addrs.end() ; ++iter) {
+    free(iter->second);
+    len = iter->first - eaddr;
+    if(len < 0) continue;
+    if(len < AccessRange) {
+      r.size += AccessRange;
+      eaddr = r.addr + r.size;
+    }
+    else{
+      ranges.push_back(r);
+      totalsize += r.size;
+      r.addr = ((iter->first) >> 12) << 12;
+      r.size = AccessRange;
+      eaddr = r.addr + r.size;
+    }
+  }
+  ranges.push_back(r);
+  totalsize += r.size;
+  return totalsize;
+}
+
 bool CkptInfo::detectOver(uint64_t exit_place, uint64_t exit_pc, uint64_t instinfo[]) 
 {
   bool isOver = false;
@@ -178,19 +266,29 @@ bool CkptInfo::detectOver(uint64_t exit_place, uint64_t exit_pc, uint64_t instin
   }
 
   //add syscall buffer addr information to all addresses
+  uint8_t exist[8];
   for(int i=0;i<sysinfos.size();i++){
+    if(sysinfos[i].data.size()<1)
+      continue;
     uint64_t addr = sysinfos[i].bufaddr;
-    for(int j=0;j<sysinfos[i].data.size();j++, addr++){
-      this->preAccess.insert(addr);
+    uint64_t base = (addr >> 12) << 12;
+    addr = addr + sysinfos[i].data.size() + 4096;
+    for(;base <= addr; base+=4096){
+      addAddrInfo(base, 1, exist);
     }
   }
 
   this->getFistloads();
   for(int i=0;i<firstloads.size();i++){
-    for(int c=0;c<8;c++) {
-      this->preAccess.insert(firstloads[i].addr + c);
+    uint64_t t1 = (firstloads[i].addr >> 12) << 12;
+    addAddrInfo(t1, 1, exist);
+    if(t1+4096 < firstloads[i].addr+8){
+      addAddrInfo(t1+4096, 1, exist);
     }
   }
+  printf("preAccess size: %llu\n", preAccess.size());
+  printf("textAccess size: %llu\n", textAccess.size());
+
   this->textsize = this->getRange(this->textAccess, this->textrange);
   this->memsize = this->getRange(this->preAccess, this->memrange);
 
@@ -212,16 +310,36 @@ bool CkptInfo::detectOver(uint64_t exit_place, uint64_t exit_pc, uint64_t instin
       }
     }
   }
+
+  uint64_t s1=preAccess.size()*AccessRange/1024;
+  uint64_t s2=textAccess.size()*64/1024;
+  uint64_t s3=firstloads.size()*128/1024;
+  uint64_t s4=(memrange.size() + textrange.size())*128/1024;
+  uint64_t totalsize = s1+s2+s3+s4;
+  printf("preAccess memsize: %d KB\n", s1);
+  printf("textAccess memsize: %d KB\n", s2);
+  printf("firstloads memsize: %d KB\n", s3);
+  printf("range memsize: %d KB\n", s4);
+  printf("totalsize: %d MB\n", totalsize/1024);
   
   saveDetailInfo();
   saveCkptInfo();
-  // saveSysInfo();
+
   preAccess.clear();
   textAccess.clear();
   firstloads.clear();
   memrange.clear();
   textrange.clear();
   sysinfos.clear();
+
+  map<uint64_t, uint8_t *>().swap(preAccess);
+  set<uint64_t>().swap(textAccess);
+  vector<FirstLoadInfo>().swap(firstloads);
+  vector<CodeRange>().swap(memrange);
+  vector<CodeRange>().swap(textrange);
+  vector<SyscallInfo>().swap(sysinfos);
+  malloc_trim(0);
+
   return isOver;
 }
 
@@ -439,12 +557,21 @@ void CkptInfo::saveSysInfo(FILE *p)
     int idx = newsysinfos1[i];
     fwrite(&sysinfos[idx].bufaddr, sizeof(uint64_t), 1, p);
     fwrite(&sysinfos[idx].data[0], 1, sysinfos[idx].data.size(), p);
+    vector<uint8_t>().swap(sysinfos[idx].data);
   }
 
   sys_idxs.clear();
   newsysinfos.clear(), newsysinfos1.clear(); //no data
   prepc.clear(), prepc1.clear();
   prenum.clear(), prenum1.clear();
+
+  vector<uint32_t>().swap(sys_idxs);
+  vector<uint32_t>().swap(newsysinfos);
+  vector<uint32_t>().swap(newsysinfos1);
+  set<uint64_t>().swap(prepc);
+  set<uint64_t>().swap(prepc1);
+  set<uint32_t>().swap(prenum);
+  set<uint32_t>().swap(prenum1);
 }
 
 
@@ -476,5 +603,6 @@ void CkptInfo::saveSysInfo1(FILE *p)
 
   for(int i=0; i<temp; i++) {
     fwrite(&sysinfos[i].data[0], 1, sysinfos[i].data.size(), p);
+    vector<uint8_t>().swap(sysinfos[i].data);
   }
 }

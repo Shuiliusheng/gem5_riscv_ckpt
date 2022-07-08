@@ -57,4 +57,5 @@ extern bool needCreateCkpt;
 extern bool readCkptSetting;
 extern uint64_t takeOverSysAddr;
 extern uint64_t ckptstartnum;
+extern bool strictLength;
 #endif
