@@ -21,6 +21,7 @@
             - readckpt: ./perlbench_ckpt_10000000.info 
               - readckpt: 用于指明当前是利用readckpt.riscv来读取一个已有的ckpt文件来重新创建不同的片段文件
               - ./perlbench_ckpt_10000000.info: 用于指明readckpt正在读取的ckpt文件。在执行过程中通过读取该文件中的系统调用信息来创建新的ckpt文件
+            - strictLength: 指定该参数时，将不再寻找退出指令，而是选择直接在设定的指令长度停止信息收集，直接保存ckpt文件
         ```c
             //正常创建ckpt文件的settings文件样例
             //./build/RISCV/gem5.fast ./configs/example/se.py --cpu-type=NonCachingSimpleCPU --mem-type=SimpleMemory --mem-size=8GB --ckptsetting=settings -c bench/test.riscv
@@ -28,9 +29,10 @@
             stacktop: 270582939648
             ckptprefix: ./test
             ckptctrl: 10000 10000 1000 4
-            ckptctrl: 60000 20000 1000 4
+            ckptctrl: 60000 20000 1000 4    
+    strictLength: 
         ```
-
+        
         ```c
             //利用readckpt_new.riscv执行ckpt文件，并且重新创建新的ckpt文件的方法
             //.,... --ckptsetting=settings -c 利用readckpt_new.riscv --options="./perlbench_ckpt_10000000.info ./perlbench.riscv"
