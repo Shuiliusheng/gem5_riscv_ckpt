@@ -183,6 +183,7 @@ void produceJmpInst(uint64_t npc)
     }
     pcs.push_back(runinfo->exitpc);
     if(maxtarget < runinfo->exitpc) maxtarget = runinfo->exitpc;
+    if(maxtarget < npc) maxtarget = npc;
 
     midpoints.push_back(TPoint2);
 
