@@ -591,59 +591,27 @@ class DecodeUnit(implicit p: Parameters) extends BoomModule
   //                       (uop.ldst === RA)
 
   //-------------------------------------------------------------
-  //Enable_MaxInsts_Support:
-  val setEvent = (cs.uopc === uopADDI) && (inst(RD_MSB,RD_LSB) === 0.U)
-  val getEvent = setEvent && (inst(31, 29) =/= 0.U)
-  uop.setEvent := setEvent
+  //Enable_Sample_Support:
+  val event_tag = WireInit(0.U(12.W))
+  event_tag := inst(31, 20)
+  val ucsrInst = (cs.uopc === uopADDI) && (inst(RD_MSB,RD_LSB) === 0.U)
+  val get_ucsr = ucsrInst && event_tag(11, 5) === 1.U   //32-63
+  uop.ucsrInst := ucsrInst
 
   //Enable_PerfCounter_Support:
-  val opCounter = (cs.uopc === uopANDI) && (inst(RD_MSB,RD_LSB) === 0.U)
-  val readCounter = opCounter && (inst(29, 29) === 1.U) //tag == 512, 此时是读
-  uop.opCounter := opCounter
+  val readCounter = ucsrInst && event_tag(11, 7) === 1.U  //128 - 256
+  uop.readCounter := readCounter
 
-  when (readCounter || getEvent) {
+  when (readCounter || get_ucsr) {
     uop.ldst := inst(RS1_MSB,RS1_LSB)
   }
 
-  when (opCounter || setEvent) {
+  when (ucsrInst) {
     uop.is_unique := true.B
   }
 
   when (readCounter) {
     uop.uopc := uopADDI
-    uop.imm_packed := 0.U
-  }
-
-  //Enable_Ckpt_Support
-  val opTempReg  = (cs.uopc === uopORI) && (inst(RD_MSB,RD_LSB) === 0.U)
-  val getTempReg = opTempReg && (inst(23, 22) === 1.U)
-  val setTempReg = opTempReg && (inst(23, 22) === 2.U)
-  val jmpTempReg = opTempReg && (inst(23, 22) === 3.U)
-  val rtemp = WireInit(0.U(6.W))
-  rtemp := Cat(1.U(1.W), Cat(0.U(3.W), inst(21, 20)))
-
-  when (jmpTempReg) {
-    uop.uopc := uopJALR
-    uop.is_jalr := true.B
-    uop.fu_code := FU_JMP
-    uop.ldst := 0.U
-    uop.lrs1 := rtemp
-    uop.ldst_val := false.B
-  }
-
-  when (getTempReg) {
-    uop.uopc := uopADDI
-    uop.ldst := inst(RS1_MSB, RS1_LSB)
-    uop.lrs1 := rtemp
-  }
-
-  when (setTempReg) {
-    uop.uopc := uopADDI
-    uop.ldst := rtemp
-  }
-
-  when (jmpTempReg || getTempReg || setTempReg) {
-    uop.lrs2_rtype := RT_X
     uop.imm_packed := 0.U
   }
 
