@@ -38,17 +38,16 @@ typedef struct{
     uint64_t syscall_info_addr;
     uint64_t nowcallnum;
     uint64_t totalcallnum;
-    uint64_t intregs[32];
-    uint64_t fpregs[32];
-    uint64_t oldregs[32];
+    uint32_t exitJmpInst;
+    JmpRepInfo *sysJmpinfos;
+
+    //perf counter information
     uint64_t cycles;
     uint64_t insts;
     uint64_t lastcycles;
     uint64_t lastinsts;
     uint64_t startcycles;
     uint64_t startinsts;
-    uint32_t exitJmpInst;
-    JmpRepInfo *sysJmpinfos;
 }RunningInfo;
 
 void takeoverSyscall();
@@ -64,11 +63,10 @@ void updateJmpInst(JmpRepInfo &info);
 
 extern uint64_t takeOverAddr;
 extern MemRangeInfo text_seg;
-
-#define RunningInfoAddr 0x150000
-#define StoreIntRegAddr "0x150028"
-#define StoreFpRegAddr  "0x150128"
-#define OldIntRegAddr   "0x150228"
+extern RunningInfo runningInfo;
+extern uint64_t readckpt_regs[32];
+extern uint64_t program_intregs[32];
+extern uint64_t program_fpregs[32];
 
 #define TPoint1 0x100000
 #define TPoint2 0x1FF000
@@ -78,17 +76,7 @@ extern MemRangeInfo text_seg;
     "jal x0, 0x100000  \n\t"   \
 ); 
 
-#define Load_necessary(BaseAddr) asm volatile( \
-    "li a0, " BaseAddr " \n\t"   \
-    "ld sp,8*2(a0)  \n\t"   \
-    "ld gp,8*3(a0)  \n\t"   \
-    "ld tp,8*4(a0)  \n\t"   \
-    "ld fp,8*8(a0)  \n\t"   \
-); 
-
-#define Context_Operation(Op, BaseAddr) asm volatile( \
-    "li a0, " BaseAddr " \n\t"   \
-    Op "0,8*0(a0)  \n\t"   \
+#define Context_Operation(Op) \
     Op "1,8*1(a0)  \n\t"   \
     Op "2,8*2(a0)  \n\t"   \
     Op "3,8*3(a0)  \n\t"   \
@@ -118,9 +106,44 @@ extern MemRangeInfo text_seg;
     Op "28,8*28(a0)  \n\t"   \
     Op "29,8*29(a0)  \n\t"   \
     Op "30,8*30(a0)  \n\t"   \
-    Op "31,8*31(a0)  \n\t"   \
-    Op "10,8*10(a0)  \n\t"   \
-);
+    Op "31,8*31(a0)  \n\t"   
+
+#define Save_ProgramIntRegs() asm volatile( \
+    "la a0, program_intregs  \n\t"  \
+    Context_Operation("sd x")       \
+);  
+
+#define Load_ProgramIntRegs() asm volatile( \
+    "la a0, program_intregs  \n\t"      \
+    Context_Operation("ld x")           \
+    "ld a0,8*10(a0) # restore a0 \n\t"   \
+); 
+
+#define Save_ProgramFpRegs() asm volatile( \
+    "la a0, program_fpregs  \n\t"   \
+    Context_Operation("fsd f")       \
+);  
+
+#define Load_ProgramFpRegs() asm volatile( \
+    "la a0, program_fpregs  \n\t"  \
+    Context_Operation("fld f")      \
+); 
+
+#define Save_ReadCkptIntRegs() asm volatile( \
+    "la a0, readckpt_regs  \n\t"  \
+    Context_Operation("sd x")      \
+);  
+
+
+#define Load_ReadCkptIntRegs() asm volatile( \
+    "la a0, readckpt_regs \n\t"   \
+    "ld ra,8*1(a0)  \n\t"   \
+    "ld sp,8*2(a0)  \n\t"   \
+    "ld gp,8*3(a0)  \n\t"   \
+    "ld tp,8*4(a0)  \n\t"   \
+    "ld fp,8*8(a0)  \n\t"   \
+); 
+
 
 #define DEFINE_CSRR(s)                     \
     static inline uint64_t __csrr_##s()    \

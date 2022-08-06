@@ -105,7 +105,7 @@ void findMidPoints(uint64_t base, uint64_t maxtarget)
 void replaceSyscall(vector<uint64_t> &pcs) 
 {
     // replace syscall with jmp to TPoint2 + 4
-    RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
+    RunningInfo *runinfo = (RunningInfo *)&runningInfo;
     setJmp(TPoint2+4, TPoint1+4);
     setJmp(TPoint1+4, takeOverAddr);
     for(int i=1;i<midpoints.size();i++){
@@ -137,7 +137,7 @@ void replaceSyscall(vector<uint64_t> &pcs)
 void produceSysRet(vector<uint64_t> &pcs)
 {
     //set jmp to syscall ret place
-    RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
+    RunningInfo *runinfo = (RunningInfo *)&runningInfo;
     JmpRepInfo *infos = (JmpRepInfo *)malloc(sizeof(JmpRepInfo) * pcs.size());
     map<uint64_t, int> jals;
 
@@ -171,7 +171,7 @@ void produceJmpInst(uint64_t npc)
     vector<uint64_t> pcs;
     pcs.push_back(npc-4);
 
-    RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
+    RunningInfo *runinfo = (RunningInfo *)&runningInfo;
     SyscallInfo *sinfos = NULL;
     uint64_t infoaddr = runinfo->syscall_info_addr + 8 + runinfo->totalcallnum*4;
     uint32_t *sysidxs = (uint32_t *)(runinfo->syscall_info_addr + 8);
@@ -183,7 +183,7 @@ void produceJmpInst(uint64_t npc)
     }
     pcs.push_back(runinfo->exitpc);
     if(maxtarget < runinfo->exitpc) maxtarget = runinfo->exitpc;
-    if(maxtarget < npc) maxtarget = npc;
+    if(maxtarget < npc-4) maxtarget = npc;
 
     midpoints.push_back(TPoint2);
 
@@ -201,6 +201,7 @@ void produceJmpInst(uint64_t npc)
 void updateJmpInst(JmpRepInfo &info)
 {
     for(int i=0;i<info.num;i++){
+        // printf("addr: 0x%lx, inst: 0x%lx\n", info.infos[i].addr, info.infos[i].inst);
         *(uint32_t *)(info.infos[i].addr) = info.infos[i].inst;
     }
     asm volatile("fence.i");

@@ -28,7 +28,7 @@ void read_ckptsyscall(FILE *fp)
     
     fread((void *)alloc_vaddr, filesize, 1, fp);
 
-    RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
+    RunningInfo *runinfo = (RunningInfo *)&runningInfo;
     runinfo->syscall_info_addr = alloc_vaddr;
     runinfo->nowcallnum = 0;
     runinfo->totalcallnum = *((uint64_t *)alloc_vaddr);
@@ -49,7 +49,7 @@ void alloc_memrange(FILE *p)
             int* arr = static_cast<int*>(mmap((void *)memrange.addr, memrange.size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, 0, 0));
             if(memrange.addr != (uint64_t)arr)
                 printf("map range: (0x%lx, 0x%lx), mapped addr: 0x%lx\n", memrange.addr, memrange.addr + memrange.size, arr);
-            assert(memrange.addr == (uint64_t)arr);  
+            // assert(memrange.addr == (uint64_t)arr);  
         }
     }
 }
@@ -73,7 +73,7 @@ void read_ckptinfo(char ckptinfo[])
 {
     uint64_t npc=0, temp=0;
     SimInfo siminfo;
-    RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
+    RunningInfo *runinfo = (RunningInfo *)&runningInfo;
     FILE *p=NULL;
     p = fopen(ckptinfo,"rb");
     if(p == NULL){
@@ -98,8 +98,8 @@ void read_ckptinfo(char ckptinfo[])
 
 
     //step 2: read integer and float registers
-    fread(&runinfo->intregs[0], 8, 32, p);
-    fread(&runinfo->fpregs[0], 8, 32, p);
+    fread(&program_intregs[0], 8, 32, p);
+    fread(&program_fpregs[0], 8, 32, p);
     printf("--- step 2, read integer and float registers ---\n");
 
     //step 3: read memory range information and map these ranges
@@ -113,12 +113,12 @@ void read_ckptinfo(char ckptinfo[])
     fclose(p);
 
     //step6: 将syscall和npc转换为jmp指令
-    printf("--- step 6, transform syscall & npc to jmp insts ---\n");
+    printf("--- step 6, transform syscall & npc to jmp insts --- 0x%lx\n", npc);
     getRangeInfo(ckptinfo);
     produceJmpInst(npc);    
 
     //try to replace exit inst if syscall totalnum == 0
-    if(runinfo->totalcallnum == 0) {
+    if(runinfo->totalcallnum == 0 && runinfo->exitpc != 0) {
         printf("--- step 6.1, syscall is zero, replace exitinst with jmp inst ---\n");
         *((uint32_t *)runinfo->exitpc) = runinfo->exitJmpInst;
     }
@@ -129,8 +129,8 @@ void read_ckptinfo(char ckptinfo[])
 
     //step7: save registers data of boot program 
     printf("--- step n, save registers data of loader, set testing program registers, start testing ---\n");
-    Context_Operation("sd x", OldIntRegAddr);
-    Context_Operation("fld f", StoreFpRegAddr);
+    Save_ReadCkptIntRegs();
+    Load_ProgramFpRegs();
 
     runinfo->cycles = 0;
     runinfo->insts = 0;
@@ -141,7 +141,6 @@ void read_ckptinfo(char ckptinfo[])
     
 
     //step8: set the testing program's register information
-    Context_Operation("ld x", StoreIntRegAddr);
-
+    Load_ProgramIntRegs();
     StartJump();
 }
