@@ -50,6 +50,7 @@ void alloc_memrange(FILE *p)
             if(memrange.addr != (uint64_t)arr)
                 printf("map range: (0x%lx, 0x%lx), mapped addr: 0x%lx\n", memrange.addr, memrange.addr + memrange.size, arr);
             // assert(memrange.addr == (uint64_t)arr);  
+            // printf("map range: (0x%lx, 0x%lx), mapped addr: 0x%lx\n", memrange.addr, memrange.addr + memrange.size, arr);
         }
     }
 }
@@ -115,7 +116,7 @@ void read_ckptinfo(char ckptinfo[])
     //step6: 将syscall和npc转换为jmp指令
     printf("--- step 6, transform syscall & npc to jmp insts --- 0x%lx\n", npc);
     getRangeInfo(ckptinfo);
-    produceJmpInst(npc);    
+    processJmp(npc);    
 
     //try to replace exit inst if syscall totalnum == 0
     if(runinfo->totalcallnum == 0 && runinfo->exitpc != 0) {
@@ -139,7 +140,6 @@ void read_ckptinfo(char ckptinfo[])
     runinfo->startcycles = __csrr_cycle();
     runinfo->startinsts = __csrr_instret();
     
-
     //step8: set the testing program's register information
     Load_ProgramIntRegs();
     StartJump();

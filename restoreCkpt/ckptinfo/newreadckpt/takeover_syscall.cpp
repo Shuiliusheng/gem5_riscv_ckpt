@@ -51,15 +51,17 @@ void takeoverSyscall()
         program_intregs[10] = infos->ret;
     }
 
+    
+    int idx = sysidxs[runinfo->nowcallnum] + 1;
+    updateJmpInst(runinfo->sysJmpinfos[idx]);
     runinfo->nowcallnum ++;
-
     if(runinfo->nowcallnum == runinfo->totalcallnum) {
         printf("--- exit the last syscall %d, and replace exit pc (0x%lx) with jmp ---\n", runinfo->nowcallnum, runinfo->exitpc);
         *((uint32_t *)runinfo->exitpc) = runinfo->exitJmpInst;
 	    asm volatile("fence.i");
     }
 
-    updateJmpInst(runinfo->sysJmpinfos[runinfo->nowcallnum]);
+    
     runinfo->lastcycles = __csrr_cycle();
     runinfo->lastinsts = __csrr_instret();
 

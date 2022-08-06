@@ -9,14 +9,11 @@
 #include <stdint.h>
 #include <unistd.h>
 
-typedef struct{
-    uint64_t addr;
-    uint32_t inst;
-}JmpInfo;
 
 typedef struct{
-    int num;
-    JmpInfo *infos;
+    uint64_t jalr_target;
+    uint64_t jal_addr;
+    uint32_t jal_inst;
 }JmpRepInfo;
 
 typedef struct{
@@ -55,9 +52,8 @@ uint64_t loadelf(char * progname, char *ckptinfo);
 void read_ckptinfo(char ckptinfo[]);
 
 bool setJmp(uint64_t instaddr, uint64_t target);
-void initMidJmpPlace();
 void getRangeInfo(char filename[]);
-void produceJmpInst(uint64_t npc);
+void processJmp(uint64_t npc);
 void updateJmpInst(JmpRepInfo &info);
 
 
@@ -67,13 +63,14 @@ extern RunningInfo runningInfo;
 extern uint64_t readckpt_regs[32];
 extern uint64_t program_intregs[32];
 extern uint64_t program_fpregs[32];
+extern uint64_t tempMemory[2];
 
-#define TPoint1 0x100000
-#define TPoint2 0x1FF000
 #define MaxJALOffset 0xFFFF0
 
 #define StartJump() asm volatile( \
-    "jal x0, 0x100000  \n\t"   \
+    "la a0, tempMemory  \n\t"   \
+    "ld a0, 0(a0)  \n\t"        \
+    "jalr x0, 0(a0)  \n\t"      \
 ); 
 
 #define Context_Operation(Op) \
