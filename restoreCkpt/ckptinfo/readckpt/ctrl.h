@@ -4,73 +4,99 @@
 #include<unistd.h>
 #include<stdio.h>
 #include<string.h>
+#include<stdint.h>
 #include"define.h"
 
-unsigned long long exit_counters[64];
 
-unsigned long long intregs[32];
-unsigned long long necessaryRegs[1000];
+uint64_t placefolds[1024];
+uint64_t tempStackMem[4096];
+uint64_t hpcounters[64];
+uint64_t procTag=0x1234567;
+uint64_t maxevent=10000, warmupinst=1000, eventsel=0, maxperiod=0;
+uint64_t sampleHapTimes=0;
+extern uint64_t __sampleFucAddr;
 
-unsigned long long npc=0;
-unsigned long long procTag=0x1234567;
-unsigned long long exitFucAddr=0x10f68;
-unsigned long long maxinst=1000000, warmupinst=0;
-char str_temp[300];
 
-unsigned long long startcycle = 0, endcycle = 0;
-unsigned long long startinst = 0, endinst = 0;
-extern unsigned long long __exitFucAddr;
+uint64_t startcycle = 0, endcycle = 0;
+uint64_t startinst = 0, endinst = 0;
 
-void exit_record();
-void exit_fuc()
+void sample_func();
+void read_counters();
+void init_start(uint64_t max_inst, uint64_t warmup_inst, uint64_t max_period);
+
+void init_start(uint64_t max_inst, uint64_t warmup_inst, uint64_t max_period)
+{ 
+    printf("warmup: %d, maxinst: %d, period: %d\n", warmup_inst, max_inst, max_period);
+    startcycle = read_csr_cycle();
+    startinst = read_csr_instret();
+
+    Save_Basic_Regs();
+    tempStackMem[32] = (uint64_t) &tempStackMem[2048]; //set sp
+    tempStackMem[33] = (uint64_t) &tempStackMem[2560]; //set s0 = sp + 512*8
+    printf("sample function addr: 0x%lx, sp: 0x%lx, s0: 0x%lx\n", &__sampleFucAddr, tempStackMem[32], tempStackMem[33]); 
+
+    maxevent = 10000000, warmupinst = 10000000, eventsel=0, maxperiod = max_period;
+    SetCounterLevel("0");
+	RESET_COUNTER;
+    SetSampleBaseInfo(procTag, &__sampleFucAddr);
+    SetSampleCtrlReg(maxevent, warmupinst, eventsel);
+    SetPfcEnable(1);
+}
+
+
+void sample_func()
 {
-    asm volatile("__exitFucAddr: ");
+    asm volatile("__sampleFucAddr: ");
     Save_ALLIntRegs();
     Load_Basic_Regs();
 
-    GetNPC(npc);
-    SetNPC(npc);
+    uint64_t exitpc=0;
+    GetExitPC(exitpc);
+    SetTempReg(exitpc, 0);
+    sampleHapTimes++;
 
     endcycle = read_csr_cycle();
     endinst = read_csr_instret();
-    sprintf(str_temp, "total cycles: %ld,  total inst: %ld\n", endcycle - startcycle, endinst - startinst);
-    write(1, str_temp, strlen(str_temp));
+    char str[256];
+    sprintf(str, "{\"type\": \"max_inst\", \"times\": %d, \"cycles\": %ld, \"inst\": %ld}\n", sampleHapTimes, endcycle - startcycle, endinst - startinst);
+    write(1, str, strlen(str));  
 
-    exit_record();
-    // exit(0);
+    read_counters();
+    startcycle = endcycle;
+    startinst = endinst;
+    sprintf(str, "exitpc: 0x%lx\n", exitpc);
+    write(1, str, strlen(str)); 
+    for(int i=0;i<32;i++) {
+        sprintf(str, "reg %d: 0x%lx\n", i, tempStackMem[i]);
+        write(1, str, strlen(str)); 
+    }
 
-    // warmupinst = 30000;
-    // SetCtrlReg(procTag, &__exitFucAddr, maxinst, warmupinst);
+    // if(sampleHapTimes >= maxperiod) {
+    //     exit(0);
+    // }
+
+    warmupinst = 0;
+    RESET_COUNTER;
+    SetPfcEnable(1);
+    SetSampleBaseInfo(procTag, &__sampleFucAddr);
+    SetSampleCtrlReg(maxevent, warmupinst, eventsel);
     Load_ALLIntRegs();
-    URet();
+    JmpTempReg(0);
 }
 
-void init_start(unsigned long long max_inst, unsigned long long warmup_inst)
-{
-    //----------------------------------------------------
-    //用于保存一些必要的寄存器值， 同时将necessRegs[400]作为新的sp，用于临时使用
-    unsigned long long t1 = (unsigned long long)&intregs[0];
-    unsigned long long t2 = (unsigned long long)&necessaryRegs[0];
-    unsigned long long t3 = 0;
-    necessaryRegs[0]=(unsigned long long)&necessaryRegs[400];
-    SetTempRegs(t1, t2, t3);
-    Save_Basic_Regs();
-    SetCounterLevel("0");
-    startcycle = read_csr_cycle();
-    startinst = read_csr_instret();
-	RESET_COUNTER;
-    SetCtrlReg(procTag, &__exitFucAddr, max_inst, warmup_inst);
-}
 
-void exit_record()
-{
-	ReadCounter16(&exit_counters[0], 0);
-	ReadCounter16(&exit_counters[16], 16);
-	ReadCounter16(&exit_counters[32], 32);
 
-	for(int n=0;n<48;n++){
-		sprintf(str_temp, "{\"type\": \"event %2d\", \"value\": %llu}\n", n, exit_counters[n]);
-        write(1, str_temp, strlen(str_temp));
+void read_counters()
+{
+	ReadCounter16(&hpcounters[0], 0);
+	ReadCounter16(&hpcounters[16], 16);
+	ReadCounter16(&hpcounters[32], 32);
+	ReadCounter16(&hpcounters[48], 48);
+
+    char str[256];
+	for(int n=50;n<53;n++){
+		sprintf(str, "{\"type\": \"event %2d\", \"value\": %llu}\n", n, hpcounters[n]);
+        write(1, str, strlen(str));
     }
 }
 

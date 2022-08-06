@@ -6,10 +6,10 @@ uint64_t takeOverAddr = (uint64_t)&__takeOverSys_Addr;
 void takeoverSyscall()
 {
     asm volatile("__takeOverSys_Addr: ");
-    Context_Operation("sd x", StoreIntRegAddr);
-    Load_necessary(OldIntRegAddr);
+    Save_ProgramIntRegs();
+    Load_ReadCkptIntRegs();
 
-    RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
+    RunningInfo *runinfo = (RunningInfo *)&runningInfo;
     uint64_t cycles = 0, insts = 0;
     cycles = __csrr_cycle();
     insts = __csrr_instret();
@@ -26,12 +26,11 @@ void takeoverSyscall()
     uint64_t infoaddr = runinfo->syscall_info_addr + 8 + runinfo->totalcallnum*4;
     uint32_t *sysidxs = (uint32_t *)(runinfo->syscall_info_addr + 8);
     SyscallInfo *infos = (SyscallInfo *)(infoaddr + sysidxs[runinfo->nowcallnum]*sizeof(SyscallInfo));
-    runinfo->intregs[10] = infos->p0;
+    program_intregs[10] = infos->p0;
 
     uint64_t sysnum = infos->num >> 32;
-    // printf("syscall %d: %d\n", runinfo->nowcallnum, sysnum);
-    if(runinfo->intregs[17] != sysnum){
-        printf("syscall num is wrong! callnum: 0x%lx, recorded num: 0x%lx, 0x%lx\n", runinfo->intregs[17], infos->pc, sysnum);
+    if(program_intregs[17] != sysnum){
+        printf("syscall num is wrong! callnum: 0x%lx, recorded num: 0x%lx, 0x%lx\n", program_intregs[17], infos->pc, sysnum);
         exit(0);
     }
 
@@ -50,7 +49,7 @@ void takeoverSyscall()
     }
     uint64_t hasret = infos->data_offset % 256;
     if(hasret) {
-        runinfo->intregs[10] = infos->ret;
+        program_intregs[10] = infos->ret;
     }
 
     runinfo->nowcallnum ++;
@@ -62,11 +61,11 @@ void takeoverSyscall()
     }
 
     uint64_t npc = infos->pc + 4;
-    WriteTemp(0, npc);
+    SetTempReg(npc, 2);
 
     runinfo->lastcycles = __csrr_cycle();
     runinfo->lastinsts = __csrr_instret();
 
-    Context_Operation("ld x", StoreIntRegAddr);
-    JmpRTemp(0);
+    Load_ProgramIntRegs();
+    JmpTempReg(2);
 }

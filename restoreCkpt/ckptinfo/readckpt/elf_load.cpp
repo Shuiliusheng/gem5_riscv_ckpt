@@ -56,6 +56,7 @@ static inline int get_prot(uint32_t p_flags)
   return (prot_x | prot_w | prot_r);
 }
 
+uint64_t tempdata[4096];
 uint64_t loadelf(char * progname, char *ckptinfo)
 {
 	Elf64_Ehdr ehdr;
@@ -72,7 +73,7 @@ uint64_t loadelf(char * progname, char *ckptinfo)
     uint64_t numinfos = 0;
     fread(&numinfos, 8, 1, fp1);
     printf("textinfo: %d\n", numinfos);
-    MemRangeInfo *textinfo = (MemRangeInfo *)RunningInfoAddr;
+    MemRangeInfo *textinfo =  (MemRangeInfo *)&tempdata[0];
     fread(&textinfo[0], sizeof(MemRangeInfo), numinfos, fp1);
     fclose(fp1);
 

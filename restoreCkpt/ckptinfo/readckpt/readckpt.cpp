@@ -1,5 +1,10 @@
 #include "ckptinfo.h"
 
+uint64_t placefold[1024];
+uint64_t readckpt_regs[32];
+uint64_t program_intregs[32];
+uint64_t program_fpregs[32];
+RunningInfo runningInfo;
 
 int main(int argc, char **argv)
 {
@@ -8,20 +13,9 @@ int main(int argc, char **argv)
         printf("./readckpt.riscv ckptinfo.log exe\n");
         return 0;
     }
-
-    uint64_t alloc_vaddr = (uint64_t)mmap((void*)RunningInfoAddr, 4096*2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON | MAP_FIXED, -1, 0);
-    if(alloc_vaddr != RunningInfoAddr){
-        printf("cannot alloc memory in 0x%lx for record runtime information, alloc: 0x%lx\n", RunningInfoAddr, alloc_vaddr);
-        return 0;
-    }
+    uint64_t alloc_vaddr = 0;
     printf("stack addr: 0x%lx\n", &alloc_vaddr);
     loadelf(argv[2], argv[1]);
-
-    int setwarmup = 0;
-    printf("argc: %d\n", argc);
-    if(argc == 4) {
-        sscanf(argv[3], "%d", &setwarmup);
-    }
-    read_ckptinfo(argv[1], setwarmup);
+    read_ckptinfo(argv[1]);
     return 0;
 }

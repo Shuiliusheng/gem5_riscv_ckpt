@@ -1,86 +1,141 @@
 #ifndef   _DEFINE_H_  
 #define   _DEFINE_H_
 
+
 //-------------------------------------------------------------------
-#define SetProcTag(srcreg)          "addi x0, " srcreg ", 1 \n\t"  
-#define SetExitFuncAddr(srcreg)     "addi x0, " srcreg ", 2 \n\t"  
-#define SetMaxInsts(srcreg)         "addi x0, " srcreg ", 3 \n\t"  
-#define SetUScratch(srcreg)         "addi x0, " srcreg ", 4 \n\t" 
-#define SetURetAddr(srcreg)         "addi x0, " srcreg ", 5 \n\t"  
-#define SetMaxPriv(srcreg)          "addi x0, " srcreg ", 6 \n\t"  
-#define SetTempReg(srcreg, rtemp)   "addi x0, " srcreg ", 7+" #rtemp " \n\t"  
-#define SetStartInsts(srcreg)       "addi x0, " srcreg ", 10 \n\t"   
+//设置和读取一些新增加的特殊寄存器值
+#define Set_ProcTag(srcreg)          "addi x0, " srcreg ", 1 \n\t"  
+#define Set_SampleFuncAddr(srcreg)   "addi x0, " srcreg ", 2 \n\t"  
+#define Set_EventSel(srcreg)         "addi x0, " srcreg ", 3 \n\t"   
+#define Set_MaxEvents(srcreg)        "addi x0, " srcreg ", 4 \n\t"  
+#define Set_WarmupInsts(srcreg)      "addi x0, " srcreg ", 5 \n\t"   
+#define Set_MaxPriv(srcreg)          "addi x0, " srcreg ", 6 \n\t"  
+#define Set_PfcEnable(srcreg)        "addi x0, " srcreg ", 7 \n\t"   
+#define Set_SampleHap(srcreg)        "addi x0, " srcreg ", 8 \n\t"   
+#define Set_TempReg(srcreg, rtemp)   "addi x0, " srcreg ", 9+" #rtemp " \n\t"  
 
-#define GetProcTag(dstreg)          "addi x0, " dstreg ", 1025 \n\t"  
-#define GetUScratch(dstreg)         "addi x0, " dstreg ", 1026 \n\t"  
-#define GetExitNPC(dstreg)          "addi x0, " dstreg ", 1027 \n\t"  
-#define GetTempReg(dstreg, rtemp)   "addi x0, " dstreg ", 1028+" #rtemp " \n\t"  
+#define Get_ProcTag(dstreg)         "addi x0, " dstreg ", 33 \n\t" 
+#define Get_SampleHap(dstreg)       "addi x0, " dstreg ", 34 \n\t"  
+#define Get_ExitNPC(dstreg)         "addi x0, " dstreg ", 35 \n\t"  
+#define Get_TempReg(dstreg, rtemp)  "addi x0, " dstreg ", 36+" #rtemp " \n\t"  
+#define Get_SampleFuncAddr(dstreg)  "addi x0, " dstreg ", 41 \n\t"  
+#define Get_MaxEvents(dstreg)       "addi x0, " dstreg ", 42 \n\t"  
+#define Get_NowEvents(dstreg)       "addi x0, " dstreg ", 43 \n\t"  
+#define Get_EventSel(dstreg)        "addi x0, " dstreg ", 44 \n\t"  
+#define Get_Maxpriv(dstreg)         "addi x0, " dstreg ", 45 \n\t"  
 
-#define URet() asm volatile( "addi x0, x0, 128  # uret \n\t" ); 
+#define SpecialInst_URet(rtemp)     "addi x0, x" rtemp ", 64 \n\t" 
+#define SpecialInst_RstPFC          "addi x0, x0, 127 \n\t" 
 
 //---------------------------------------------------------------------
 
-#define GetNPC(npc) asm volatile( \
-    GetExitNPC("t0")    \
-    "mv %[npc], t0  # uretaddr \n\t"  \
-    : [npc]"=r"(npc)\
+#define GetInformation(tag, eaddr, mevent, nevent, esel, mpriv) asm volatile( \
+    Get_ProcTag("t0")    \
+    "mv %[v0], t0  \n\t"  \
+    Get_SampleFuncAddr("t0")    \
+    "mv %[v1], t0  \n\t"  \
+    Get_MaxEvents("t0")    \
+    "mv %[v2], t0  \n\t"  \
+    Get_NowEvents("t0")    \
+    "mv %[v3], t0  \n\t"  \
+    Get_EventSel("t0")    \
+    "mv %[v4], t0  \n\t"  \
+    Get_Maxpriv("t0")    \
+    "mv %[v5], t0  \n\t"  \
+    : [v0]"=r"(tag), [v1]"=r"(eaddr), [v2]"=r"(mevent), [v3]"=r"(nevent), [v4]"=r"(esel), [v5]"=r"(mpriv)\
     :  \
 ); 
 
-#define SetNPC(npc) asm volatile( \
-    "mv t0, %[npc]    \n\t"  \
-    SetURetAddr("t0")  \
-    : \
-    :[npc]"r"(npc)  \
+
+#define GetExitPC(npc) asm volatile( \
+    Get_ExitNPC("t0")    \
+    "mv %[value], t0  # uretaddr \n\t"  \
+    : [value]"=r"(npc)\
+    :  \
 ); 
+
+#define GetSampleHappen(shap) asm volatile( \
+    Get_SampleHap("t0") \
+    "mv %[value], t0   \n\t"  \
+    : [value]"=r"(shap)\
+    :  \
+); 
+
+#define SetSampleHappen(shap) asm volatile( \
+    "mv t0, %[value]    \n\t"  \
+    Set_SampleHap("t0")  \
+    : \
+    :[value]"r"(shap)  \
+); 
+
 
 #define SetCounterLevel(priv) asm volatile( \
     "li t0, " priv "  # priv: user/super/machine \n\t"  \
-    SetMaxPriv("t0")  \
+    Set_MaxPriv("t0")  \
 ); 
 
 
-#define SetCtrlReg(tag, exitFucAddr, maxinst, startinst) asm volatile( \
-    "mv t0, %[rtemp1]  # tag \n\t"  \
-    SetProcTag("t0")        \
-    "mv t0, %[rtemp2]  # exit \n\t"  \
-    SetExitFuncAddr("t0")   \
-    "mv t0, %[rtemp3]  # maxinst \n\t"  \
-    SetMaxInsts("t0")       \
-    "mv t0, %[rtemp4]  # startinst \n\t"  \
-    SetStartInsts("t0")     \
-    : \
-    :[rtemp1]"r"(tag), [rtemp2]"r"(exitFucAddr), [rtemp3]"r"(maxinst), [rtemp4]"r"(startinst)\
-); 
-
-
-#define SetTempRegs(t1, t2, t3) asm volatile( \
+#define SetTempReg(value, n) asm volatile( \
     "mv t0, %[rtemp1]  \n\t"    \
-    SetTempReg("t0", 0)       \
-    "mv t0, %[rtemp2]  \n\t"    \
-    SetTempReg("t0", 1)       \
-    "mv t0, %[rtemp3]  \n\t"    \
-    SetTempReg("t0", 2)       \
+    Set_TempReg("t0", n)         \
     : \
-    :[rtemp1]"r"(t1), [rtemp2]"r"(t2), [rtemp3]"r"(t3)  \
+    :[rtemp1]"r"(value)         \
 );
 
 
+#define SetPfcEnable(n) asm volatile( \
+    "li t0, " #n "  \n\t"  \
+    Set_PfcEnable("t0")  \
+); 
+
+
+#define JmpTempReg(n) asm volatile( \
+    SpecialInst_URet(#n) \
+);
+
+
+#define SetSampleBaseInfo(ptag, sampleFuncAddr) asm volatile( \
+    "mv t0, %[value1]   \n\t"  \
+    Set_ProcTag("t0")        \
+    "mv t0, %[value2]   \n\t"  \
+    Set_SampleFuncAddr("t0")   \
+    : \
+    :[value1]"r"(ptag), [value2]"r"(sampleFuncAddr)  \
+); 
+
+
+#define SetSampleCtrlReg(maxevent, warmupinst, eventsel) asm volatile( \
+    "mv t0, %[value1]  # maxinst \n\t"  \
+    Set_MaxEvents("t0")       \
+    "mv t0, %[value2]  # warmup \n\t"  \
+    Set_WarmupInsts("t0")     \
+    "mv t0, %[value3]  # evensel \n\t"  \
+    Set_EventSel("t0")       \
+    "li t0, 1    \n\t"      \
+    "addi x0, t0, 12  #SetPfcEnable \n\t"  \
+    : \
+    :[value1]"r"(maxevent), [value2]"r"(warmupinst), [value3]"r"(eventsel) \
+); 
+
+
+extern uint64_t tempStackMem[4096];
 #define Load_Basic_Regs() asm volatile( \
-    GetTempReg("t0", 1)   \
+    "la t0, tempStackMem  \n\t"   \
+    "addi t0, t0, 256  \n\t"   \
     "ld sp,8*0(t0)  \n\t"   \
-    "ld gp,8*1(t0)  \n\t"   \
-    "ld tp,8*2(t0)  \n\t"   \
-    "ld fp,8*3(t0)  \n\t"   \
-    "ld ra,8*4(t0)  \n\t"   \
+    "ld s0,8*1(t0)  \n\t"   \
+    "ld ra,8*2(t0)  \n\t"   \
+    "ld gp,8*3(t0)  \n\t"   \
+    "ld tp,8*4(t0)  \n\t"   \
 ); 
 
 #define Save_Basic_Regs() asm volatile( \
-    GetTempReg("t0", 1)   \
-    "sd gp,8*1(t0)  \n\t"   \
-    "sd tp,8*2(t0)  \n\t"   \
-    "sd fp,8*3(t0)  \n\t"   \
-    "sd ra,8*4(t0)  \n\t"   \
+    "la t0, tempStackMem  \n\t"   \
+    "addi t0, t0, 256  \n\t"   \
+    "sd s0,8*1(t0)  \n\t"   \
+    "sd ra,8*2(t0)  \n\t"   \
+    "sd gp,8*3(t0)  \n\t"   \
+    "sd tp,8*4(t0)  \n\t"   \
 ); 
 
 #define Regs_Operations(Op) \
@@ -115,24 +170,27 @@
     Op "30,8*30(a0)  \n\t"   \
     Op "31,8*31(a0)  \n\t"   
 
+
 #define Save_ALLIntRegs() asm volatile( \
-    SetUScratch("a0")     \
-    GetTempReg("a0", 0)   \
+    Set_TempReg("a0", 0)  \
+    "la a0, tempStackMem  \n\t"   \
     Regs_Operations("sd x") \
+    Get_TempReg("a1", 0)  \
+    "sd a1,8*10(a0)  # save a0 \n\t"   \
 );  
 
 #define Load_ALLIntRegs() asm volatile( \
-    GetTempReg("a0", 0)     \
+    "la a0, tempStackMem  \n\t"    \
     Regs_Operations("ld x") \
-    GetUScratch("a0")       \
+    "ld a0,8*10(a0) # restore a0 \n\t"   \
 ); 
 
 
 //-------------------------------------------------------------------
-#define RESET_COUNTER asm volatile(" andi x0, t0, 1024 \n\t" );
+#define RESET_COUNTER asm volatile(SpecialInst_RstPFC);
 
 #define GetCounter(basereg, dstreg, start, n)    \
-              "andi x0, " dstreg ", 512+" #start "+" #n " \n\t" \
+              "addi x0, " dstreg ", 128+" #start "+" #n " \n\t" \
               "sd " dstreg ", " #n "*8(" basereg ") \n\t"
 
 #define ReadCounter8(base, start) asm volatile( \

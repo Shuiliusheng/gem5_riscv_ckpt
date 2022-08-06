@@ -32,7 +32,7 @@ void read_ckptsyscall(FILE *fp)
     fread((void *)alloc_vaddr, filesize, 1, fp);
     fclose(fp);
 
-    RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
+    RunningInfo *runinfo = (RunningInfo *)&runningInfo;
     runinfo->syscall_info_addr = alloc_vaddr;
     runinfo->nowcallnum = 0;
     runinfo->totalcallnum = *((uint64_t *)alloc_vaddr);
@@ -85,13 +85,13 @@ void setFistLoad(FILE *p)
 }
 
 
-void read_ckptinfo(char ckptinfo[], int setwarmup)
+void read_ckptinfo(char ckptinfo[])
 {
     uint64_t npc, mrange_num=0, loadnum = 0, temp=0;
     MemRangeInfo memrange, extra;
     LoadInfo loadinfo;
     SimInfo siminfo;
-    RunningInfo *runinfo = (RunningInfo *)RunningInfoAddr;
+    RunningInfo *runinfo = (RunningInfo *)&runningInfo;
     uint64_t cycles[2], insts[2];
     cycles[0] = __csrr_cycle();
     insts[0] = __csrr_instret();
@@ -115,15 +115,14 @@ void read_ckptinfo(char ckptinfo[], int setwarmup)
 
     printf("sim slice info, start: %ld, simNum: %ld, rawLength: %ld, warmup: %ld, exitpc: 0x%lx, cause: %ld\n", siminfo.start, siminfo.simNum, runLength, warmup, siminfo.exitpc, runinfo->exit_cause);
     
-
     //step 1: read npc
     fread(&npc, 8, 1, p);
     printf("--- step 1, read npc: 0x%lx ---\n", npc);
 
 
     //step 2: read integer and float registers
-    fread(&runinfo->intregs[0], 8, 32, p);
-    fread(&runinfo->fpregs[0], 8, 32, p);
+    fread(&program_intregs[0], 8, 32, p);
+    fread(&program_fpregs[0], 8, 32, p);
     printf("--- step 2, read integer and float registers ---\n");
 
     //step 3: read memory range information and map these ranges
@@ -147,12 +146,13 @@ void read_ckptinfo(char ckptinfo[], int setwarmup)
 
     //step6: init npc and takeover_syscall addr to temp register
     printf("--- step 6, init npc to rtemp(5) and takeover_syscall addr to rtemp(6) ---\n");
-    WriteTemp(0, npc);
-    WriteTemp(1, takeOverAddr);
+    SetTempReg(npc, 2);
+    SetTempReg(takeOverAddr, 3);
 
     //step7: save registers data of boot program 
     printf("--- step 789, save registers data of boot program, set testing program registers, start testing ---\n");
-    Context_Operation("sd x", OldIntRegAddr);
+    Save_ReadCkptIntRegs();
+    Load_ProgramFpRegs();
 
     runinfo->cycles = 0;
     runinfo->insts = 0;
@@ -160,30 +160,19 @@ void read_ckptinfo(char ckptinfo[], int setwarmup)
     runinfo->lastinsts = __csrr_instret();
     runinfo->startcycles = __csrr_cycle();
     runinfo->startinsts = __csrr_instret();
-    if(setwarmup!=0) {
-        uint64_t total = runLength + warmup;
-        if(runLength == 0)
-            total = siminfo.simNum;
-        printf("maxinst: %ld, warmup %ld\n", total-setwarmup, setwarmup);
-        init_start(total-setwarmup, setwarmup);
+    
+    if(runLength != 0){
+        init_start(runLength, warmup, 1);
     }
     else {
-        if(runLength != 0){
-            printf("maxinst: %ld, warmup %ld\n", runLength, warmup);
-            init_start(runLength, warmup);
-        }
-        else {
-            warmup = siminfo.simNum/20;
-            runLength = siminfo.simNum - warmup;
-            printf("maxinst: %ld, warmup %ld\n", runLength, warmup);
-            init_start(runLength, warmup);
-        }
+        warmup = siminfo.simNum/20;
+        runLength = siminfo.simNum - warmup;
+        init_start(runLength, warmup, 1);
     }
     
     //step8: set the testing program's register information
-    Context_Operation("fld f", StoreFpRegAddr);
-    Context_Operation("ld x", StoreIntRegAddr);
+    Load_ProgramIntRegs();
 
     //step9: start the testing program
-    JmpRTemp(0); //WriteTemp(0, npc);
+    JmpTempReg(2);
 }
