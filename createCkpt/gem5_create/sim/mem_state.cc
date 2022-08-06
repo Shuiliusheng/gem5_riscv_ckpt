@@ -471,6 +471,8 @@ MemState::extendMmap(Addr length)
             _mmapEnd,
             _ownerProcess->mmapGrowsDown() ? start : start + length);
 
+    printf("memstate: extending mmap region (old %p) (new %p)\n", _mmapEnd, _ownerProcess->mmapGrowsDown() ? start : start + length);
+
     _mmapEnd = _ownerProcess->mmapGrowsDown() ? start : start + length;
 
     return start;

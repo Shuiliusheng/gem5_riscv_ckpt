@@ -786,7 +786,7 @@ AtomicSimpleCPU::tick()
                     }
 
                     if(startlog) {
-                        if(numInst > pendingCkpts[0]->startnum + pendingCkpts[0]->length) {
+                        if(numInst >= pendingCkpts[0]->startnum + pendingCkpts[0]->length) {
                             if(strictLength) {
                                 ckpt_detectOver(numInst, 0, instnums);
                             }

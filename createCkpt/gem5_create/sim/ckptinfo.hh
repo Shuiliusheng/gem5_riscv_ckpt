@@ -59,7 +59,7 @@ class SyscallInfo{
 
 #define AccessRange 8192
 #define AccessRangeBits 13
-
+#define RecordInstNum 1000
 class CkptInfo{
   public:
     char filename[300];
@@ -73,6 +73,10 @@ class CkptInfo{
     vector<SyscallInfo> sysinfos;
     map<uint64_t, uint8_t *> preAccess;
     set<uint64_t> textAccess;
+    // exit_information
+    map<uint32_t, uint32_t> instNumInfo;
+    uint32_t instNumRes[RecordInstNum+1];
+    uint64_t nowInstNum;
 
     CkptInfo(uint64_t startnum, uint64_t length, uint64_t warmup, uint64_t intregs[], uint64_t fpregs[], uint64_t pc, uint64_t npc, char filename[], uint64_t instinfo[]){
       this->startnum = startnum;
@@ -87,10 +91,12 @@ class CkptInfo{
       this->sysinfos.clear();
       this->preAccess.clear();
       this->textAccess.clear();
+      this->instNumInfo.clear();
       this->length = length;
       this->pc = pc;
       this->npc = npc;
       this->warmup = warmup;
+      nowInstNum = 0;
 
       if(strlen(filename) < 1) {
         strcpy(this->filename, "bench");
@@ -111,6 +117,7 @@ class CkptInfo{
       this->memrange.clear();
       this->textrange.clear();
       this->sysinfos.clear();
+      this->instNumInfo.clear();
     }
 
   public:
@@ -120,6 +127,7 @@ class CkptInfo{
     void addload(uint64_t addr, uint8_t *data, unsigned char size);
     void addstore(uint64_t addr, unsigned char size);
     void addinst(uint64_t addr);
+    uint32_t getinstNum(uint64_t addr);
 
     void add_sysenter(uint64_t pc, uint32_t sysnum, vector<uint64_t> &params);
     void add_sysret(uint64_t pc, string name, bool hasret, uint64_t ret);

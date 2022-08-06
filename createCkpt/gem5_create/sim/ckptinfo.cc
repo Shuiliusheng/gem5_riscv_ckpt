@@ -87,6 +87,36 @@ void CkptInfo::addinst(uint64_t addr)
   this->textAccess.insert(addr);
   if(t1+4096 < addr+4)
     this->textAccess.insert(addr+4096);
+
+  // exit_information
+  // nowInstNum++;
+  // uint32_t temp = 1;
+  // if(nowInstNum >= warmup) {
+  //   map<uint32_t, uint32_t>::iterator it = instNumInfo.find((uint32_t)addr);
+  
+  //   if(it == instNumInfo.end()) {
+  //     instNumInfo[(uint32_t)addr] = 1;
+  //   }
+  //   else {
+  //     temp = instNumInfo[(uint32_t)addr] + 1;
+  //     instNumInfo[(uint32_t)addr] = temp;
+  //   }
+  // }
+
+  // if(nowInstNum >= length && nowInstNum < (length+RecordInstNum)) {
+  //   instNumRes[nowInstNum-length] = temp;
+  // }
+}
+
+uint32_t CkptInfo::getinstNum(uint64_t addr) 
+{
+  map<uint32_t, uint32_t>::iterator it = instNumInfo.find((uint32_t)addr);
+  if(it == instNumInfo.end()) {
+    return 1;
+  }
+  else {
+    return instNumInfo[(uint32_t)addr];
+  }
 }
 
 
@@ -298,15 +328,19 @@ bool CkptInfo::detectOver(uint64_t exit_place, uint64_t exit_pc, uint64_t instin
     printf("memrange and textrange are overlap: 0x%lx, 0x%lx\n", textend, memrange[0].addr);
     vector<CodeRange>::iterator iter;
     for (iter = memrange.begin(); iter != memrange.end();){
-      if (iter->addr > textend) {
+      if (iter->addr < textend) {
         uint64_t temp = iter->addr + iter->size;
         if(temp > textend) {
           iter->addr = textend;
           iter->size = temp - textend;
+          iter++;
         }
         else {
           iter = memrange.erase(iter);
         }
+      }
+      else {
+        break;
       }
     }
   }
@@ -331,8 +365,10 @@ bool CkptInfo::detectOver(uint64_t exit_place, uint64_t exit_pc, uint64_t instin
   memrange.clear();
   textrange.clear();
   sysinfos.clear();
+  instNumInfo.clear();
 
   map<uint64_t, uint8_t *>().swap(preAccess);
+  map<uint32_t, uint32_t>().swap(instNumInfo);
   set<uint64_t>().swap(textAccess);
   vector<FirstLoadInfo>().swap(firstloads);
   vector<CodeRange>().swap(memrange);
@@ -396,6 +432,16 @@ void CkptInfo::saveDetailInfo()
   fprintf(p, "isLoad: %lld, isStore: %lld, isAtomic: %lld\n", instinfo[0], instinfo[1], instinfo[2]); 
   fprintf(p, "isControl: %lld, isCall: %lld, isReturn: %lld\n", instinfo[3], instinfo[4], instinfo[5]); 
   fprintf(p, "isCondCtrl: %lld, isUncondCtrl: %lld, isIndirectCtrl: %lld\n", instinfo[6], instinfo[7], instinfo[8]); 
+
+  // exit_information
+  // fprintf(p, "\n-- last exit inst running number --\n");
+  // uint64_t value = 0;
+  // for(int i=0;i<RecordInstNum;i++){
+  //   fprintf(p,"lastinst, %d, %d\n", i, instNumRes[i]);
+  //   value += instNumRes[i];
+  // }
+  // fprintf(p,"average_lastinst, %d\n", value/RecordInstNum);
+
   fclose(p);
 }
 
@@ -420,6 +466,8 @@ void CkptInfo::saveCkptInfo()
   //start information
   uint64_t mem[5];
   mem[0] = startnum;
+  if(readCkptSetting)
+    mem[0] = ckptstartnum + this->startnum;
   mem[1] = simNums + (warmup << 32);
   mem[2] = exit_pc;
   mem[3] = 2 + ((length-warmup) << 2);
