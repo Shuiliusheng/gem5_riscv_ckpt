@@ -7,8 +7,9 @@ dflags=""
 target="readckpt_new.riscv"
 
 filelist=`find . -name "*.cpp" `
-echo ${cc} $filelist $flags $dflags -o ${target}
-${cc} $filelist $flags $dflags -o ${target}
+echo ${cc} $filelist $flags $dflags -T ./link.lds -o ${target}
+${cc} $filelist $flags $dflags -T ./link.lds -o ${target}
+# ${cc} $filelist $flags $dflags -o ${target}
 
 echo ${objdump} -d ${target} 
 ${objdump} -d ${target} >read.s
