@@ -39,18 +39,23 @@ void init_ckpt_settings(const char filename[])
     }
     if(temp.find("mmapend") != temp.npos) {
       sscanf(&str[idx+1], "%llx", &v1);
-      printf("xmmapend: 0x%lx\n", v1);
+      printf("mmapend: 0x%lx\n", v1);
       ckptsettings.mmapend = v1;
     }
     else if(temp.find("stacktop") != temp.npos) {
       sscanf(&str[idx+1], "%llx", &v1);
-      printf("xstacktop: 0x%lx\n", v1);
+      printf("stacktop: 0x%lx\n", v1);
       ckptsettings.stack_base = v1;
+    }
+    else if(temp.find("brkpoint") != temp.npos) {
+      sscanf(&str[idx+1], "%llx", &v1);
+      printf("brkpoint: 0x%lx\n", v1);
+      ckptsettings.brk_point = v1;
     }
     else if(temp.find("ckptprefix") != temp.npos) {
       idx = idx + 1;
       for(; idx<strlen(str) && str[idx] ==' '; idx++);
-      printf("xbenchname: %s\n", &str[idx]);
+      printf("benchname: %s\n", &str[idx]);
       strcpy(ckptsettings.benchname,  &str[idx]);
     }
     else if(temp.find("ckptctrl") != temp.npos) {
@@ -83,6 +88,17 @@ void init_ckpt_settings(const char filename[])
   for(int i=0;i<ckptsettings.ctrls.size();i++){
     printf("ckpt info, start: %lld, end: %lld, warmup: %lld\n", ckptsettings.ctrls[i].start, ckptsettings.ctrls[i].end, ckptsettings.ctrls[i].warmup);
   }
+
+  //when create ckpt and not set the brkpoint, we set it to a stable place 
+  //BrkPoint_For_Ckpt will determine the link place of readckpt
+  if(ckptsettings.ctrls.size()!=0 && ckptsettings.brk_point == 0) {
+    ckptsettings.brk_point = BrkPoint_For_Ckpt;
+  }
+  //when we create ckpt from the old ckpt, brkpoint doesn't need to be set
+  if(readCkptSetting) {
+    ckptsettings.brk_point = 0;
+  }
+
   fclose(p);
 }
 

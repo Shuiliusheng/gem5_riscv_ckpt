@@ -405,6 +405,8 @@ void CkptInfo::saveDetailInfo()
     printf("cannot open %s for write\n", dstname);
   }
   
+  fprintf(p, "memory layout, brkpoint: 0x%lx, stack_base: 0x%lx, mapend: 0x%lx\n", ckptsettings.brk_point, ckptsettings.stack_base, ckptsettings.mmapend);
+
   fprintf(p, "ckptinfo, startnum: %lld, exitnum: %lld, length: %lld\n, warmup: %lld, pc: 0x%lx, npc: 0x%lx, exitpc: 0x%lx\n", startnum, simNums, length-warmup, warmup, pc, npc, exit_pc);
   fprintf(p, "text range num: %lld, mem range num: %lld, first load num: %lld, syscallnum: %lld\n\n", textrange.size(), memrange.size(), firstloads.size(), sysinfos.size());
   

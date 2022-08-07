@@ -14,17 +14,22 @@ typedef struct{
     uint64_t warmup;
 }CkptCtrl;
 
+#define BrkPoint_For_Ckpt 0x1400000
+
 class CkptSettings{
 public:
     char benchname[300];
     uint64_t mmapend;
     uint64_t stack_base;
+    uint64_t brk_point;
+
     vector<CkptCtrl> ctrls;
 
     CkptSettings(){
         strcpy(benchname, "");
         mmapend = 0;
         stack_base = 0;
+        brk_point = 0;
         ctrls.clear();
     }
 

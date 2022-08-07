@@ -37,6 +37,7 @@
 #include "sim/syscall_debug_macros.hh"
 #include "sim/system.hh"
 #include "sim/vma.hh"
+#include "sim/ckpt_collect.hh"
 
 namespace gem5
 {
@@ -474,7 +475,7 @@ MemState::extendMmap(Addr length)
     printf("memstate: extending mmap region (old %p) (new %p)\n", _mmapEnd, _ownerProcess->mmapGrowsDown() ? start : start + length);
 
     _mmapEnd = _ownerProcess->mmapGrowsDown() ? start : start + length;
-
+    ckptsettings.mmapend = _mmapEnd;
     return start;
 }
 

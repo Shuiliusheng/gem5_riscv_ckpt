@@ -74,17 +74,31 @@ RiscvProcess64::RiscvProcess64(const ProcessParams &params,
         loader::ObjectFile *objFile) :
         RiscvProcess(params, objFile)
 {
-    // const Addr stack_base = 0x7FFF FFFF FFFF FFFFL;
-    Addr stack_base = params.stackbase;
+    Addr stack_base = params.stackbase; //0x7FFF FFFF FFFF FFFFL;
     if(ckptsettings.stack_base != 0) stack_base = ckptsettings.stack_base;
+    else ckptsettings.stack_base = stack_base;
 
+    Addr mmap_end = params.mmapend; // 0x4000000000000000L;
+    if(ckptsettings.mmapend != 0) mmap_end = ckptsettings.mmapend;
+    else ckptsettings.mmapend = mmap_end;
+
+    Addr temp_brk_point = roundUp(image.maxAddr(), PageBytes);
+    Addr rawbrkpoint = temp_brk_point;
+    if(ckptsettings.brk_point != 0) {
+        if(ckptsettings.brk_point < temp_brk_point) {
+            for(int i=0;i<3;i++)
+                printf("Note: The program raw brk_point: 0x%lx, is bigger than the setting brk: 0x%lx. (!!!)\n\n", temp_brk_point, ckptsettings.brk_point);
+            exit(0);
+        }
+        temp_brk_point = roundUp(ckptsettings.brk_point, PageBytes);
+    }
+    else
+        ckptsettings.brk_point = temp_brk_point;
+
+    const Addr brk_point = temp_brk_point; 
     const Addr max_stack_size = 8 * 1024 * 1024;
     const Addr next_thread_stack_base = stack_base - max_stack_size;
-    const Addr brk_point = roundUp(image.maxAddr(), PageBytes);
-    // const Addr mmap_end = 0x4000000000000000L;
-    Addr mmap_end =  params.mmapend;
-    if(ckptsettings.mmapend != 0) mmap_end = ckptsettings.mmapend;
-    printf("addr info, stack_base: 0x%lx, brk: 0x%lx, mmap_end: 0x%lx, next_thread_stack_base: 0x%lx\n", stack_base, brk_point, mmap_end, next_thread_stack_base);
+    printf("***** Running Memory Layout, stack_base: 0x%lx, mmap_end: 0x%lx, brk: 0x%lx (raw: 0x%lx)\n\n\n", stack_base, mmap_end, brk_point, rawbrkpoint);
     memState = std::make_shared<MemState>(this, brk_point, stack_base,
             max_stack_size, next_thread_stack_base, mmap_end);
 }
