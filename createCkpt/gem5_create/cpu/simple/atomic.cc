@@ -748,7 +748,8 @@ AtomicSimpleCPU::tick()
                     bool isBenchInst = false;
                     uint64_t numInst = t_info.numInst;
                     if(readCkptSetting) {
-                        isBenchInst = nowpc > 0x200000;
+                        // isBenchInst = nowpc > 0x200000;
+                        isBenchInst = nowpc < 0x1000000;    //newreadckpt is start 0x1000000
                         if(isBenchInst) {
                             benchinsts++;
                             numInst = benchinsts;
