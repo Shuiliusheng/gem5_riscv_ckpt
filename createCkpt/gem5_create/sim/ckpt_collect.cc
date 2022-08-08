@@ -201,6 +201,18 @@ uint64_t syscall_info_addr = 0;
 uint64_t totalcallnum = 0;
 uint64_t infoaddr = 0;
 uint32_t *sysidxs = NULL;
+uint64_t ckpt_textstart=0x1000000000, ckpt_textend=0;
+uint8_t *ckptinst_map=NULL;
+uint32_t ct_mapsize = 1024*64;
+
+bool isCkptInst(uint64_t addr)
+{
+  if(addr >= ckpt_textend || addr < ckpt_textstart)
+    return false; 
+
+  uint32_t mapidx = (addr >> 12) - (ckpt_textstart >> 12);
+  return ckptinst_map[mapidx] == 1;
+}
 
 void initCkptSysInfo(char *filename)
 {
@@ -211,6 +223,23 @@ void initCkptSysInfo(char *filename)
   }
   uint64_t numtext = 0, nummem = 0, numloads = 0, offset = 0;
   fread(&numtext, sizeof(uint64_t), 1, p);
+
+  ckptinst_map = (uint8_t *)malloc(ct_mapsize);
+  memset(ckptinst_map, 0, ct_mapsize);
+  CodeRange range;
+  for(int i=0; i<numtext; i++) {
+    fread(&range, sizeof(CodeRange), 1, p);
+    if(i==0) ckpt_textstart = range.addr;
+    if(i==numtext-1) ckpt_textend = range.addr + range.size;
+
+    uint32_t start = (range.addr - ckpt_textstart) >> 12;
+    uint32_t end = start + (range.size >> 12);
+    for(start; start < end; start++) {
+      ckptinst_map[start] = 1;
+    }
+  }
+
+  printf("ckpt text segment information: 0x%lx 0x%lx\n", ckpt_textstart, ckpt_textend);
 
   fseek(p, 8+numtext*16, SEEK_SET);
   fread(&ckptstartnum, sizeof(uint64_t), 1, p);

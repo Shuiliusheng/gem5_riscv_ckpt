@@ -366,6 +366,8 @@ AtomicSimpleCPU::genMemFragmentRequest(const RequestPtr &req, Addr frag_addr,
     return predicate;
 }
 
+bool showdetail = false;
+
 Fault
 AtomicSimpleCPU::readMem(Addr addr, uint8_t *data, unsigned size,
                          Request::Flags flags,
@@ -430,9 +432,14 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t *data, unsigned size,
                 assert(!locked);
                 locked = true;
             }
-            //RISCV_Ckpt_Support: record load information
+            //RISCV_Ckpt_Support: record load information  || (thread->pcState().pc() < 0x1000000 && showdetail) 
             if (needCreateCkpt && startlog) { 
                 ckpt_addload(addr, data, size);
+                // printf("read mem, pc: 0x%lx, addr: 0x%lx, size: %d, data: ", thread->pcState().pc(), addr, size);
+                // if(size == 1) printf("0x%x\n", data[0]);
+                // else if(size == 2) printf("0x%x\n", *((uint16_t *)data));
+                // else if(size == 4) printf("0x%x\n", *((uint32_t *)data));
+                // else if(size == 8) printf("0x%lx\n", *((uint64_t *)data));
             }
             return fault;
         }
@@ -462,9 +469,14 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
         // This must be a cache block cleaning request
         data = zero_array;
     }
-    //RISCV_Ckpt_Support: record store information
+    //RISCV_Ckpt_Support: record store information || (thread->pcState().pc() < 0x1000000 && showdetail)
     if (needCreateCkpt && startlog) { 
         ckpt_addstore(addr, size);
+        // printf("write mem, pc: 0x%lx, addr: 0x%lx, size: %d, data: ", thread->pcState().pc(), addr, size);
+        // if(size == 1) printf("0x%x\n", data[0]);
+        // else if(size == 2) printf("0x%x\n", *((uint16_t *)data));
+        // else if(size == 4) printf("0x%x\n", *((uint32_t *)data));
+        // else if(size == 8) printf("0x%lx\n", *((uint64_t *)data));
     }
 
     // use the CPU's statically allocated write request and packet objects
@@ -483,6 +495,11 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
     int curr_frag_id = 0;
     bool predicate;
     Fault fault = NoFault;
+
+    // uint64_t nowpc = thread->pcState().pc();
+    // if(nowpc < 0x1000000) {
+    //     printf("write mem, pc: 0x%lx, addr: 0x%lx, size: %d\n", nowpc, addr, size);
+    // }
 
     while (1) {
         predicate = genMemFragmentRequest(req, frag_addr, size, flags,
@@ -598,6 +615,11 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
     Fault fault = thread->mmu->translateAtomic(
         req, thread->getTC(), BaseMMU::Write);
 
+    // uint64_t nowpc = thread->pcState().pc();
+    // if(nowpc < 0x1000000) {
+    //     printf("atomic mem, pc: 0x%lx, addr: 0x%lx, size: %d\n", nowpc, addr, size);
+    // }
+
     // Now do the access.
     if (fault == NoFault && !req->getFlags().isSet(Request::NO_ACCESS)) {
         // We treat AMO accesses as Write accesses with SwapReq command
@@ -620,15 +642,21 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
     if (fault != NoFault && req->isPrefetch()) {
         return NoFault;
     }
-    //RISCV_Ckpt_Support: record atomic instruction information
+    //RISCV_Ckpt_Support: record atomic instruction information || (thread->pcState().pc() < 0x1000000 && showdetail)
     if (needCreateCkpt && startlog) { 
         ckpt_addload(addr, data, size);
+        // printf("atomic mem, pc: 0x%lx, addr: 0x%lx, size: %d, data: ", thread->pcState().pc(), addr, size);
+        // if(size == 1) printf("0x%x\n", data[0]);
+        // else if(size == 2) printf("0x%x\n", *((uint16_t *)data));
+        // else if(size == 4) printf("0x%x\n", *((uint32_t *)data));
+        // else if(size == 8) printf("0x%lx\n", *((uint64_t *)data));
     }
 
     //If there's a fault and we're not doing prefetch, return it
     return fault;
 }
 
+uint64_t tempnum = 0;
 void
 AtomicSimpleCPU::tick()
 {
@@ -716,6 +744,21 @@ AtomicSimpleCPU::tick()
                         printf("----- simInsts: %ld \n", t_info.numInst);
                 }
 
+                //RISCV_Ckpt_Support: determine whether need to record instruction information
+                uint64_t nowpc = thread->pcState().pc();
+                bool isBenchInst = false;
+                uint64_t numInst = t_info.numInst;
+                startlog = hasValidCkpt();
+                needCreateCkpt = startlog;
+                if(readCkptSetting) {
+                    // //determine current inst whether is a ckpt instruction
+                    isBenchInst = isCkptInst(nowpc); //(nowpc <= ckpt_textend) && (nowpc >= ckpt_textstart); 
+                    if(!isBenchInst) {
+                        needCreateCkpt = false;
+                        startlog = false;
+                    }
+                }
+
                 fault = curStaticInst->execute(&t_info, traceData);
 
                 // keep an instruction count
@@ -723,32 +766,15 @@ AtomicSimpleCPU::tick()
                     countInst();
                     ppCommit->notify(std::make_pair(thread, curStaticInst));
 
-                    //RISCV_Ckpt_Support: determine whether need to record instruction information
-                    if(hasValidCkpt()){
-                        startlog = true;
-                        needCreateCkpt = true;
-                    }
-                    else {
-                        startlog = false;
-                        needCreateCkpt = false;
-                    }
-
-                    uint64_t nowpc = thread->pcState().pc();
-                    bool isBenchInst = false;
-                    uint64_t numInst = t_info.numInst;
                     //RISCV_Ckpt_Support: determine if the readckpt_new.riscv is running 
                     if(readCkptSetting) {
-                        isBenchInst = nowpc < 0x1000000;    //determine current inst whether is a ckpt instruction
                         if(isBenchInst) {
                             benchinsts++;
                             numInst = benchinsts;
                         }
-                        else {
-                           needCreateCkpt = false;
-                           startlog = false;
-                        }
 
                         if(!isBenchInst && last_isBenchInst) {
+                            printf("running %ld,  syscall pc: 0x%lx\n", benchinsts, nowpc);
                             ckpt_insert_syscall(takeSysNum);
                             takeSysNum ++;
                             preinsts.clear();

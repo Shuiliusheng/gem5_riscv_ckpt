@@ -57,6 +57,7 @@ bool hasValidCkpt();
 bool isCkptStart(uint64_t simNum, uint64_t &length);
 void initCkptSysInfo(char *filename);
 void ckpt_insert_syscall(uint32_t sysidx);
+bool isCkptInst(uint64_t addr);
 
 extern vector<CkptInfo *> pendingCkpts;
 extern CkptSettings ckptsettings;
@@ -66,4 +67,5 @@ extern bool readCkptSetting;
 extern uint64_t takeOverSysAddr;
 extern uint64_t ckptstartnum;
 extern bool strictLength;
+extern uint64_t ckpt_textstart, ckpt_textend;
 #endif
