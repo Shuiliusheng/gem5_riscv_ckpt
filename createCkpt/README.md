@@ -140,8 +140,9 @@
 
 
 5. 代码修改
+    - 修改代码的标记: RISCV_Ckpt_Support
     - 增加的文件: gem5_create/sim/ckpt_collect.cc  ckpt_collect.hh  ckptinfo.cc  ckptinfo.hh
     - 修改的文件:
         - ckpt配置: gem5_create/sim/process.cc SConscript arch/riscv/process.cc gem5_create/sim/mem_state.cc
         - 基本统计: gem5_create/cpu/simple/atomic.cc atomic.hh
-        - 系统调用: gem5_create/sim/syscall_emul.hh sim/syscall_desc.cc arch/riscv/linux/se_workload.cc
+        - 系统调用: gem5_create/sim/syscall_emul.hh sim/syscall_emul.cc sim/syscall_desc.cc arch/riscv/linux/se_workload.cc

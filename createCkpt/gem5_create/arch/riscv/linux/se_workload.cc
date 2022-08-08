@@ -103,6 +103,7 @@ EmuLinux::syscall(ThreadContext *tc)
         params.push_back(a2);
         params.push_back(a3);
         params.push_back(a4);
+        //RISCV_Ckpt_Support: record syscall information
         ckpt_add_sysenter(tc->pcState().pc(), num, params);
         params.clear();
     }
@@ -132,6 +133,7 @@ unameFunc64(SyscallDesc *desc, ThreadContext *tc, VPtr<Linux::utsname> name)
     strcpy(unametemp.version, "#1 Mon Aug 18 11:32:15 EDT 2003");
     strcpy(unametemp.machine, "riscv64");
 
+    //RISCV_Ckpt_Support: record syscall information
     if (needCreateCkpt) {
         unsigned outsize = sizeof(Linux::utsname); 
         unsigned char *outdata = (unsigned char *)(&unametemp);

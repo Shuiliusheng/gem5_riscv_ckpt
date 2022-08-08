@@ -162,6 +162,8 @@ MemState::updateBrkRegion(Addr old_brk, Addr new_brk)
     }
 
     _brkPoint = new_brk;
+    ckptsettings.brk_point = _brkPoint;
+    //RISCV_Ckpt_Support: update the running brkpoint place
 }
 
 void
@@ -476,6 +478,7 @@ MemState::extendMmap(Addr length)
 
     _mmapEnd = _ownerProcess->mmapGrowsDown() ? start : start + length;
     ckptsettings.mmapend = _mmapEnd;
+    //RISCV_Ckpt_Support: update the running mmapend place
     return start;
 }
 

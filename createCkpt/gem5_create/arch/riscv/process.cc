@@ -74,6 +74,7 @@ RiscvProcess64::RiscvProcess64(const ProcessParams &params,
         loader::ObjectFile *objFile) :
         RiscvProcess(params, objFile)
 {
+    //RISCV_Ckpt_Support: config stack mmapend brkpoint address with the ckptsettings
     Addr stack_base = params.stackbase; //0x7FFF FFFF FFFF FFFFL;
     if(ckptsettings.stack_base != 0) stack_base = ckptsettings.stack_base;
     else ckptsettings.stack_base = stack_base;

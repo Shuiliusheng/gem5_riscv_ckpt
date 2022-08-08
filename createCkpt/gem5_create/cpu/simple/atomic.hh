@@ -60,18 +60,12 @@ class AtomicSimpleCPU : public BaseSimpleCPU
 
     void init() override;
 
-    uint64_t tempregs[32];
-    uint64_t ckpt_startinsts, ckpt_endinsts, ckptinsts;
-    uint64_t benchinsts, takeSysNum;
+    //RISCV_Ckpt_Support: some config setting
+    uint64_t benchinsts, takeSysNum;  //for readckpt_new.riscv execution
     bool last_isBenchInst = false;
-
-    bool needshowFirst = false;
-    bool startlog = false;
-
-    set<Addr> preinsts;
-
-    uint64_t instnums[10];
-
+    bool startlog = false;  //for recording whether need to record instruction information
+    set<Addr> preinsts;     //for find exit instruction
+    uint64_t instnums[10];  //for record ckpt instruction type information
     void recordinst(StaticInstPtr inst) {
       if(inst->isLoad()) {
         instnums[0]++;

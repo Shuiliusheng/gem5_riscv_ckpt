@@ -1,5 +1,7 @@
 #include "sim/ckpt_collect.hh"
 
+//RISCV_Ckpt_Support: new file for configing checkpoint and running settings, and collecting running information
+
 vector<CkptInfo *> pendingCkpts;
 CkptSettings ckptsettings;
 int ckptidx = 0;

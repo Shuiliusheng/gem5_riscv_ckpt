@@ -15,6 +15,8 @@
 #include "base/trace.hh"
 using namespace std;
 
+//RISCV_Ckpt_Support: new file for storing the information of each ckpt
+
 typedef struct{
   uint64_t addr;
   uint64_t size;

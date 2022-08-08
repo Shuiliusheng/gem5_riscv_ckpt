@@ -8,6 +8,9 @@
 #include "sim/ckptinfo.hh"
 using namespace std;
 
+//RISCV_Ckpt_Support: new file for configing checkpoint and running settings, and collecting running information
+
+
 typedef struct{
     uint64_t start;
     uint64_t end;

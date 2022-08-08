@@ -2,6 +2,8 @@
 #include "sim/ckpt_collect.hh"
 #include <malloc.h>
 
+//RISCV_Ckpt_Support: new file for storing the information of each ckpt
+
 void CkptInfo::addAddrInfo(uint64_t addr, uint8_t size, uint8_t exist[])
 {
   uint64_t base = (addr >> AccessRangeBits) << AccessRangeBits;

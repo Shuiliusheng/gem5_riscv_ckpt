@@ -53,7 +53,7 @@ SyscallDesc::doSyscall(ThreadContext *tc)
     else
         DPRINTF_SYSCALL(Base, "Returned %d.\n", retval.encodedValue());
 
-    // if (GEM5_UNLIKELY(TRACING_ON && ::gem5::debug::CreateCkpt)) { 
+    //RISCV_Ckpt_Support: record the syscall ret information 
     if (needCreateCkpt) { 
         RegVal num = tc->readIntReg(17);
         ckpt_add_sysret(tc->pcState().pc(), dumper(name(), tc), !retval.suppressed(), retval.encodedValue());

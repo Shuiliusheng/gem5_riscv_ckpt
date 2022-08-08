@@ -104,6 +104,7 @@ exitFutexWake(ThreadContext *tc, VPtr<> addr, uint64_t tgid)
         unsigned char *outdata = (unsigned char *)(ctidBuf.bufferPtr());
         unsigned long long dstaddr = (unsigned long long)addr;
         unsigned long long res = 0;
+        //RISCV_Ckpt_Support: record syscall information
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
     }
 
@@ -347,6 +348,7 @@ _llseekFunc(SyscallDesc *desc, ThreadContext *tc,
         unsigned char *outdata = (unsigned char *)(result_buf.bufferPtr());
         unsigned long long dstaddr = (unsigned long long)result_ptr;
         unsigned long long res = 0;
+        //RISCV_Ckpt_Support: record syscall information
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
         printf("_llseek syscall\n");
     }
@@ -388,6 +390,7 @@ gethostnameFunc(SyscallDesc *desc, ThreadContext *tc,
         unsigned char *outdata = (unsigned char *)(name.bufferPtr());
         unsigned long long dstaddr = (unsigned long long)buf_ptr;
         unsigned long long res = 0;
+        //RISCV_Ckpt_Support: record syscall information
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
         printf("gethostnameFunc syscall\n");
     }
@@ -426,14 +429,7 @@ getcwdFunc(SyscallDesc *desc, ThreadContext *tc,
         unsigned char *outdata = (unsigned char *)(buf.bufferPtr());
         unsigned long long dstaddr = (unsigned long long)buf_ptr;
         unsigned long long res = result;
-        // char *str = (char *)malloc(1000 + outsize*8); //tc->readIntReg(11)
-        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
-        // for(int i=0;i<outsize-1;i++){
-        //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
-        // }
-        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-        // free(str);
-
+        //RISCV_Ckpt_Support: record syscall information
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
     }
 
@@ -500,14 +496,7 @@ readlinkFunc(SyscallDesc *desc, ThreadContext *tc,
         unsigned char *outdata = (unsigned char *)(buf.bufferPtr());
         unsigned long long dstaddr = (unsigned long long)buf_ptr;
         unsigned long long res = result;
-        // char *str = (char *)malloc(1000 + outsize*8); //tc->readIntReg(11)
-        // sprintf(str, "{\"type\":\"syscall info\", \"info\": \"setdata\", \"pc\": \"0x%llx\", \"buf\": \"0x%llx\", \"bytes\": \"0x%llx\", \"ret\": \"0x%llx\", \"data\": [ ", tc->pcState().pc(), dstaddr, outsize, res);
-        // for(int i=0;i<outsize-1;i++){
-        //     sprintf(str, "%s\"0x%x\",", str, outdata[i]);
-        // }
-        // DPRINTF(CreateCkpt, "%s\"0x%x\" ]}\n", str, outdata[outsize-1]);
-        // free(str);
-
+        //RISCV_Ckpt_Support: record syscall information
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
     }
 
@@ -915,6 +904,7 @@ pipe2Func(SyscallDesc *desc, ThreadContext *tc, VPtr<> tgt_addr, int flags)
         unsigned char *outdata = (unsigned char *)(tgt_handle.bufferPtr());
         unsigned long long dstaddr = (unsigned long long)tgt_addr;
         unsigned long long res = 0;
+        //RISCV_Ckpt_Support: record syscall information
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
         printf("pipe2 syscall\n");
     }
@@ -1189,6 +1179,7 @@ getdentsImpl(SyscallDesc *desc, ThreadContext *tc,
         unsigned char *outdata = (unsigned char *)(buf_arg.bufferPtr());
         unsigned long long dstaddr = (unsigned long long)buf_ptr;
         unsigned long long res = 0;
+        //RISCV_Ckpt_Support: record syscall information
         ckpt_add_sysexe(tc->pcState().pc(), res, dstaddr, outsize, outdata);
         printf("getdents syscall\n");
     }
