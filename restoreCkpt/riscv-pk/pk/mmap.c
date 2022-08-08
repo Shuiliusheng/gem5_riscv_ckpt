@@ -18,7 +18,8 @@ typedef struct {
   int prot;
 } vmr_t;
 
-#define MAX_VMR (RISCV_PGSIZE / sizeof(vmr_t))
+//increase more page for record mmap information
+#define MAX_VMR (RISCV_PGSIZE*100 / sizeof(vmr_t))
 static spinlock_t vm_lock = SPINLOCK_INIT;
 static vmr_t* vmrs;
 
@@ -37,13 +38,23 @@ static uintptr_t __page_alloc()
   return addr;
 }
 
+//used to alloc more memory for mmap record
+static uintptr_t __page_alloc1()
+{
+  kassert(next_free_page != free_pages);
+  uintptr_t addr = first_free_page + RISCV_PGSIZE * 100 * next_free_page;
+  next_free_page = next_free_page + 100;
+  memset((void*)addr, 0, RISCV_PGSIZE*100);
+  return addr;
+}
+
 static vmr_t* __vmr_alloc(uintptr_t addr, size_t length, file_t* file,
                           size_t offset, unsigned refcnt, int prot)
 {
   if (!vmrs) {
     spinlock_lock(&vm_lock);
       if (!vmrs) {
-        vmr_t* page = (vmr_t*)__page_alloc();
+        vmr_t* page = (vmr_t*)__page_alloc1();
         mb();
         vmrs = page;
       }
@@ -282,8 +293,9 @@ uintptr_t do_mmap(uintptr_t addr, size_t length, int prot, int flags, int fd, of
   spinlock_lock(&vm_lock);
     addr = __do_mmap(addr, length, prot, flags, f, offset);
 
-    if (addr < current.brk_max)
-      current.brk_max = addr;
+    // if (addr < current.brk_max) {  
+    //   current.brk_max = addr;
+    // }
   spinlock_unlock(&vm_lock);
 
   if (f) file_decref(f);
@@ -394,6 +406,7 @@ uintptr_t pk_vm_init()
 {
   // HTIF address signedness and va2pa macro both cap memory size to 2 GiB
   mem_size = MIN(mem_size, 1U << 31);
+  mem_size = 1U << 31;  //set the memory to the max value: 2GB
   size_t mem_pages = mem_size >> RISCV_PGSHIFT;
   free_pages = MAX(8, mem_pages >> (RISCV_PGLEVEL_BITS-1));
 
@@ -411,6 +424,7 @@ uintptr_t pk_vm_init()
   size_t stack_bottom = __do_mmap(current.mmap_max - stack_size, stack_size, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED, 0, 0);
   kassert(stack_bottom != (uintptr_t)-1);
   current.stack_top = stack_bottom + stack_size;
+  printk("mmap_max: 0x%lx, brk_max: 0x%lx, stack_size: 0x%lx, stack_bottom: 0x%lx, stack_top: 0x%lx\n", current.mmap_max, current.brk_max, stack_size, stack_bottom, current.stack_top);
 
   flush_tlb();
   write_csr(sptbr, ((uintptr_t)root_page_table >> RISCV_PGSHIFT) | SATP_MODE_CHOICE);

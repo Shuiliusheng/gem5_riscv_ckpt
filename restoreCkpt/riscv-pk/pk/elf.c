@@ -74,8 +74,10 @@ void load_elf(const char* fn, elf_info* info)
     if(ph[i].p_type == PT_LOAD && ph[i].p_memsz) {
       uintptr_t prepad = ph[i].p_vaddr % RISCV_PGSIZE;
       uintptr_t vaddr = ph[i].p_vaddr + bias;
-      if (vaddr + ph[i].p_memsz > info->brk_min)
+      if (vaddr + ph[i].p_memsz > info->brk_min){
         info->brk_min = vaddr + ph[i].p_memsz;
+        printk("load segment %d, vaddr: 0x%lx, pmemsz: 0x%lx, brkmin: 0x%lx\n", i, vaddr, ph[i].p_memsz, info->brk_min);
+      }
       int flags2 = flags | (prepad ? MAP_POPULATE : 0);
       int prot = get_prot(ph[i].p_flags);
       if (__do_mmap(vaddr - prepad, ph[i].p_filesz + prepad, prot | PROT_WRITE, flags2, file, ph[i].p_offset - prepad) != vaddr - prepad)
