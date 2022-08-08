@@ -1,8 +1,0 @@
-commit a3e4ac61d2b1ff37a22b9193b85d3b94273e80cb (HEAD -> master)
-Merge: bf64bb8 fafaedd
-Author: Palmer Dabbelt <palmer@sifive.com>
-Date:   Wed Aug 14 18:57:39 2019 -0700
-
-    Merge pull request #172 from riscv/version
-    
-    Mark PK as version 1.0.  0
