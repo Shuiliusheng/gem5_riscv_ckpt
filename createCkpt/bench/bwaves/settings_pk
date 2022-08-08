@@ -1,0 +1,7 @@
+mmapend: 0x30000000
+stacktop: 0x74000000
+ckptprefix: ./ckpt/bwaves
+strictLength: 
+ckptctrl: 100000000 100000000 20000000 2
+
+ 
