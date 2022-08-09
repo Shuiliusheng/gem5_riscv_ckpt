@@ -93,8 +93,8 @@ void read_ckptinfo(char ckptinfo[])
     SimInfo siminfo;
     RunningInfo *runinfo = (RunningInfo *)&runningInfo;
     uint64_t cycles[2], insts[2];
-    cycles[0] = __csrr_cycle();
-    insts[0] = __csrr_instret();
+    cycles[0] = read_csr_cycle();
+    insts[0] = read_csr_instret();
 
     FILE *p=NULL;
     p = fopen(ckptinfo,"rb");
@@ -140,8 +140,8 @@ void read_ckptinfo(char ckptinfo[])
         *((uint32_t *)runinfo->exitpc) = (ECall_Replace);
     }
 
-    cycles[1] = __csrr_cycle();
-    insts[1] = __csrr_instret();
+    cycles[1] = read_csr_cycle();
+    insts[1] = read_csr_instret();
     printf("load ckpt running info, cycles: %ld, insts: %ld\n", cycles[1]-cycles[0], insts[1]-insts[0]);
 
     //step6: init npc and takeover_syscall addr to temp register
@@ -156,10 +156,10 @@ void read_ckptinfo(char ckptinfo[])
 
     runinfo->cycles = 0;
     runinfo->insts = 0;
-    runinfo->lastcycles = __csrr_cycle();
-    runinfo->lastinsts = __csrr_instret();
-    runinfo->startcycles = __csrr_cycle();
-    runinfo->startinsts = __csrr_instret();
+    runinfo->lastcycles = read_csr_cycle();
+    runinfo->lastinsts = read_csr_instret();
+    runinfo->startcycles = read_csr_cycle();
+    runinfo->startinsts = read_csr_instret();
     
     if(runLength != 0){
         init_start(runLength, warmup, 1);

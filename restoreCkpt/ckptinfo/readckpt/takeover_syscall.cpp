@@ -11,8 +11,8 @@ void takeoverSyscall()
 
     RunningInfo *runinfo = (RunningInfo *)&runningInfo;
     uint64_t cycles = 0, insts = 0;
-    cycles = __csrr_cycle();
-    insts = __csrr_instret();
+    cycles = read_csr_cycle();
+    insts = read_csr_instret();
     runinfo->cycles += (cycles - runinfo->lastcycles);
     runinfo->insts += (insts - runinfo->lastinsts);
     
@@ -63,8 +63,8 @@ void takeoverSyscall()
     uint64_t npc = infos->pc + 4;
     SetTempReg(npc, 2);
 
-    runinfo->lastcycles = __csrr_cycle();
-    runinfo->lastinsts = __csrr_instret();
+    runinfo->lastcycles = read_csr_cycle();
+    runinfo->lastinsts = read_csr_instret();
 
     Load_ProgramIntRegs();
     JmpTempReg(2);

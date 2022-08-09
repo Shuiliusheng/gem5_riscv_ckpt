@@ -92,17 +92,4 @@ extern uint64_t program_fpregs[32];
     "ld fp,8*8(a0)  \n\t"   \
 ); 
 
-#define DEFINE_CSRR(s)                     \
-    static inline uint64_t __csrr_##s()    \
-    {                                      \
-        uint64_t value;                    \
-        __asm__ volatile("csrr    %0, " #s \
-                         : "=r"(value)     \
-                         :);               \
-        return value;                      \
-    }
-
-DEFINE_CSRR(cycle)
-DEFINE_CSRR(instret)
-
 #endif
