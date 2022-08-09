@@ -138,8 +138,15 @@
         - mem range information
         - running instruction information
 
-
-5. 代码修改
+5. 利用readckpt_new.riscv，根据已有的ckpt.info文件创建新的ckpt.info文件
+   - 目的：从已有的ckpt文件创建新的片段，加快创建ckpt的速度，避免了每次重新执行程序的所有代码
+     - （可以先将程序创建为多个指令数较多的checkpoint文件，之后再根据每个单独创建需求的checkpoint文件，以此加快速度）
+   - 原理：readckpt_new.riscv和ckpt文件中的指令可以被区分开，并且恢复执行过程中的takeOverFunc也可以被识别出来，即系统调用也可以被识别出来
+     - ckpt文件中记录的使用的代码段信息，根据该信息将能够区分两者
+     - readckpt_new.riscv中为了完成系统调用的功能会将某些代码段中的空闲空间作为跳转的中转节点，但是仍旧可以根据ckpt文件中记录的使用的代码段信息进行区分
+     - 为了实现系统调用的功能，readckpt_new.riscv会是ecall指令跳转到readckpt_new.riscv中的takeOverFunc中，因此在这个过程中会出现ckpt指令切换到非ckpt指令的情况，据此将可以识别出发生了系统调用。此时可以根据系统调用号从ckpt文件中读取到系统调用信息，重新记录下来。
+  
+6. 代码修改
     - 修改代码的标记: RISCV_Ckpt_Support
     - 增加的文件: gem5_create/sim/ckpt_collect.cc  ckpt_collect.hh  ckptinfo.cc  ckptinfo.hh
     - 修改的文件:
