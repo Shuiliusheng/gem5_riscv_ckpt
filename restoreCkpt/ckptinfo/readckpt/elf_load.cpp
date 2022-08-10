@@ -61,9 +61,6 @@ uint64_t loadelf(char * progname, char *ckptinfo)
 {
 	Elf64_Ehdr ehdr;
 	Elf64_Phdr phdr;
-    uint64_t cycles[2], insts[2];
-    cycles[0] = read_csr_cycle();
-    insts[0] = read_csr_instret();
 
     FILE *fp1 = fopen(ckptinfo, "rb");
     if (fp1 == 0) {
@@ -130,8 +127,5 @@ uint64_t loadelf(char * progname, char *ckptinfo)
         }
 	}
     fclose(fp);
-    cycles[1] = read_csr_cycle();
-    insts[1] = read_csr_instret();
-    printf("load elf running info, cycles: %ld, insts: %ld\n", cycles[1]-cycles[0], insts[1]-insts[0]);
     return 0;
 }

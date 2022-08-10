@@ -1,7 +1,9 @@
 #include "ckptinfo.h"
 #include "ctrl.h"
-#include <set>
 using namespace std;
+
+extern uint64_t _JmpRTemp3Inst;
+uint32_t JmpRTemp3Inst = *((uint32_t *)&_JmpRTemp3Inst);
 
 typedef struct{
     uint64_t addr;
@@ -43,13 +45,14 @@ void read_ckptsyscall(FILE *fp)
     SyscallInfo *sinfos = NULL;
     uint64_t infoaddr = runinfo->syscall_info_addr + 8 + runinfo->totalcallnum*4;
     uint32_t *sysidxs = (uint32_t *)(runinfo->syscall_info_addr + 8);
-    set<uint64_t> rep_idxs;
+    int diffcallnum = -1;
     for(int i=0; i<runinfo->totalcallnum; i++) {
-        if(rep_idxs.find(sysidxs[i]) == rep_idxs.end()) {
-            sinfos = (SyscallInfo *)(infoaddr + sysidxs[i]*sizeof(SyscallInfo));
-            *((uint32_t *)sinfos->pc) = ECall_Replace;
-            rep_idxs.insert(sysidxs[i]);
-        }
+        if((int)sysidxs[i] > diffcallnum) 
+            diffcallnum = sysidxs[i];
+    }
+    for(int i=0; i<diffcallnum+1; i++) {
+        sinfos = (SyscallInfo *)(infoaddr + i*sizeof(SyscallInfo));
+        *((uint32_t *)sinfos->pc) = JmpRTemp3Inst;
     }
 }
 
@@ -92,9 +95,6 @@ void read_ckptinfo(char ckptinfo[])
     LoadInfo loadinfo;
     SimInfo siminfo;
     RunningInfo *runinfo = (RunningInfo *)&runningInfo;
-    uint64_t cycles[2], insts[2];
-    cycles[0] = read_csr_cycle();
-    insts[0] = read_csr_instret();
 
     FILE *p=NULL;
     p = fopen(ckptinfo,"rb");
@@ -136,13 +136,9 @@ void read_ckptinfo(char ckptinfo[])
 
     //try to replace exit inst if syscall totalnum == 0
     if(runinfo->totalcallnum == 0 && runinfo->exit_cause == Cause_ExitInst) {
-        printf("--- step 5.1, syscall is zero, replace exitinst with jmp rtemp ---\n");
-        *((uint32_t *)runinfo->exitpc) = (ECall_Replace);
+        printf("--- step 5.1, syscall is zero, replace exitinst with jmp rtemp3 ---: 0x%lx\n", JmpRTemp3Inst);
+        *((uint32_t *)runinfo->exitpc) = JmpRTemp3Inst; //(ECall_Replace)
     }
-
-    cycles[1] = read_csr_cycle();
-    insts[1] = read_csr_instret();
-    printf("load ckpt running info, cycles: %ld, insts: %ld\n", cycles[1]-cycles[0], insts[1]-insts[0]);
 
     //step6: init npc and takeover_syscall addr to temp register
     printf("--- step 6, init npc to rtemp(5) and takeover_syscall addr to rtemp(6) ---\n");
@@ -162,12 +158,12 @@ void read_ckptinfo(char ckptinfo[])
     runinfo->startinsts = read_csr_instret();
     
     if(runLength != 0){
-        init_start(runLength, warmup, 1);
+        init_start(runLength, warmup, 1, ckptinfo);
     }
     else {
         warmup = siminfo.simNum/20;
         runLength = siminfo.simNum - warmup;
-        init_start(runLength, warmup, 1);
+        init_start(runLength, warmup, 1, ckptinfo);
     }
     
     //step8: set the testing program's register information
@@ -175,4 +171,7 @@ void read_ckptinfo(char ckptinfo[])
 
     //step9: start the testing program
     JmpTempReg(2);
+
+    asm volatile("_JmpRTemp3Inst: ");
+    JmpTempReg(3);
 }

@@ -1,6 +1,6 @@
 #include "ckptinfo.h"
 
-extern unsigned long long __takeOverSys_Addr;
+extern uint64_t __takeOverSys_Addr;
 uint64_t takeOverAddr = (uint64_t)&__takeOverSys_Addr;
 
 void takeoverSyscall()
@@ -55,8 +55,8 @@ void takeoverSyscall()
     runinfo->nowcallnum ++;
 
     if(runinfo->nowcallnum == runinfo->totalcallnum && runinfo->exit_cause == Cause_ExitInst) {
-        printf("--- exit the last syscall %d, and replace exit pc (0x%lx) with jmp ---\n", runinfo->nowcallnum, runinfo->exitpc);
-        *((uint32_t *)runinfo->exitpc) = ECall_Replace;
+        printf("--- exit the last syscall %d, and replace exit pc (0x%lx) with jmp3 ---\n", runinfo->nowcallnum, runinfo->exitpc);
+        *((uint32_t *)runinfo->exitpc) = JmpRTemp3Inst;
 	    asm volatile("fence.i  ");
     }
 

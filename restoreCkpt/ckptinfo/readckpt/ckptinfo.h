@@ -39,9 +39,6 @@ typedef struct{
     uint64_t startinsts;
 }RunningInfo;
 
-
-//jmpRtemp3的二进制: addi x0, x3, 64
-#define ECall_Replace 0x04018013
 #define Cause_ExitSysCall 1
 #define Cause_ExitInst 2
 
@@ -55,6 +52,7 @@ extern RunningInfo runningInfo;
 extern uint64_t readckpt_regs[32];
 extern uint64_t program_intregs[32];
 extern uint64_t program_fpregs[32];
+extern uint32_t JmpRTemp3Inst;  //jmp rtemp3的指令
 
 #define Save_ProgramIntRegs() asm volatile( \
     "la a0, program_intregs  \n\t"  \
