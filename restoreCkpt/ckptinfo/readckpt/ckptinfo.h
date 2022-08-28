@@ -68,11 +68,13 @@ extern uint32_t JmpRTemp3Inst;  //jmp rtemp3的指令
 #define Save_ProgramFpRegs() asm volatile( \
     "la a0, program_fpregs  \n\t"   \
     Regs_Operations("fsd f")       \
+    "fsd f10,8*10(a0) # restore a0 \n\t"   \
 );  
 
 #define Load_ProgramFpRegs() asm volatile( \
     "la a0, program_fpregs  \n\t"  \
     Regs_Operations("fld f")      \
+    "fld f10,8*10(a0) # restore a0 \n\t"   \
 ); 
 
 #define Save_ReadCkptIntRegs() asm volatile( \

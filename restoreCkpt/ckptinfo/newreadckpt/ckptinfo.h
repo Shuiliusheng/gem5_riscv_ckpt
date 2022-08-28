@@ -119,11 +119,13 @@ extern uint64_t tempMemory[2];
 #define Save_ProgramFpRegs() asm volatile( \
     "la a0, program_fpregs  \n\t"   \
     Context_Operation("fsd f")       \
+    "fsd f10,8*10(a0) # restore a0 \n\t"   \
 );  
 
 #define Load_ProgramFpRegs() asm volatile( \
     "la a0, program_fpregs  \n\t"  \
     Context_Operation("fld f")      \
+    "fld f10,8*10(a0) # restore a0 \n\t"   \
 ); 
 
 #define Save_ReadCkptIntRegs() asm volatile( \
