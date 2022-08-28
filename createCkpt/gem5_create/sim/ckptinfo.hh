@@ -151,4 +151,7 @@ class CkptInfo{
 };
 
 
+void saveFLoads(vector<FirstLoadInfo> &firstloads, FILE *q);
+void saveFLoads_comp(vector<FirstLoadInfo> &firstloads, FILE *q);
+
 #endif

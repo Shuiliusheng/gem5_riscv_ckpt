@@ -486,9 +486,7 @@ void CkptInfo::saveCkptInfo()
   fwrite(&memrange[0], sizeof(CodeRange), temp, p);
 
   //first load information
-  temp = firstloads.size();
-  fwrite(&temp, sizeof(uint64_t), 1, p);
-  fwrite(&firstloads[0], sizeof(FirstLoadInfo), temp, p);
+  saveFLoads_comp(this->firstloads, p);
 
   //save syscall information 
   saveSysInfo(p);

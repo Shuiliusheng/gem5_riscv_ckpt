@@ -250,8 +250,18 @@ void initCkptSysInfo(char *filename)
   
   offset = ftell(p) + nummem*16;
   fseek(p, offset, SEEK_SET);
-  fread(&numloads, sizeof(uint64_t), 1, p);
-  offset = ftell(p) + numloads*16;
+
+  //read the compress ckpts
+  uint64_t compsize = 0;
+  while(1) {
+    compsize = 0;
+    fread(&compsize, 8, 1, p);
+    if(compsize == 0) break;
+
+    offset = ftell(p) + 8 + compsize;
+    fseek(p, offset, SEEK_SET);
+  }
+  offset = ftell(p);
   
   fseek(p, 0, SEEK_END);
   uint64_t filesize = ftell(p) - offset;

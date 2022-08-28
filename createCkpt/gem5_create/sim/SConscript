@@ -88,6 +88,8 @@ Source('workload.cc')
 Source('mem_pool.cc')
 Source('ckpt_collect.cc')
 Source('ckptinfo.cc')
+Source('fastlz.cc')
+Source('ckpt_saveFLoads.cc')
 
 GTest('byteswap.test', 'byteswap.test.cc', '../base/types.cc')
 GTest('guest_abi.test', 'guest_abi.test.cc')
