@@ -62,7 +62,7 @@ void read_datamap(FILE *p, vector<LoadInfo> &tempinfos)
             taddr = addr + (i*8*8);
             for(int m=0; m<8; m++) {
                 if(cmap[i]%2==1) {
-                    fread((uint64_t *)(info.data), 8, 1, p);
+                    fread((uint64_t *)(&info.data), 8, 1, p);
                     info.addr = taddr + m*8;
                     tempinfos.push_back(info);
                 }
