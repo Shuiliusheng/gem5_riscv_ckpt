@@ -214,6 +214,55 @@ bool isCkptInst(uint64_t addr)
   return ckptinst_map[mapidx] == 1;
 }
 
+uint64_t read_floads(FILE *p)
+{
+  uint64_t compsize = 0, offset, loadnum=0, mapsize = 0, addr = 0;
+  uint64_t compressTag = 0;
+  uint8_t cmap[1024];
+  fread(&compressTag, 8, 1, p);
+  if(compressTag-0x123456 == 1){
+    printf("the first load information is saved with data map\n");
+    while(1){
+      addr = 0;
+      fread(&addr, 8, 1, p);
+      if(addr==0) break;
+
+      fread(&mapsize, 8, 1, p);
+      mapsize = mapsize/64;
+      fread(&cmap, 1, mapsize, p);
+      loadnum = 0;
+      for(int i=0;i<mapsize;i++) {
+        for(int m=0; m<8; m++) {
+          if(cmap[i]%2==1) loadnum++;
+          cmap[i] = cmap[i] >> 1;
+        }
+      }
+      offset = ftell(p) + loadnum*8;
+      fseek(p, offset, SEEK_SET);
+    }
+    offset = ftell(p);
+  }
+  else if(compressTag-0x123456 == 2 || compressTag-0x123456 == 3){
+    printf("the first load information is saved with data map and compressed by fastlz\n");
+    while(1) {
+      compsize = 0;
+      fread(&compsize, 8, 1, p);
+      if(compsize == 0) break;
+      offset = ftell(p) + 8 + compsize;
+      fseek(p, offset, SEEK_SET);
+    }
+    offset = ftell(p);
+  }
+  else{
+    printf("the first load information is saved without compress\n");
+    offset = ftell(p) - 8;
+    fseek(p, offset, SEEK_SET);
+    fread(&loadnum, 8, 1, p);
+    offset = offset + 8 + loadnum*16; 
+  }
+  return offset;
+}
+
 void initCkptSysInfo(char *filename)
 {
   FILE *p = fopen(filename,"rb");
@@ -252,16 +301,7 @@ void initCkptSysInfo(char *filename)
   fseek(p, offset, SEEK_SET);
 
   //read the compress ckpts
-  uint64_t compsize = 0;
-  while(1) {
-    compsize = 0;
-    fread(&compsize, 8, 1, p);
-    if(compsize == 0) break;
-
-    offset = ftell(p) + 8 + compsize;
-    fseek(p, offset, SEEK_SET);
-  }
-  offset = ftell(p);
+  offset = read_floads(p);
   
   fseek(p, 0, SEEK_END);
   uint64_t filesize = ftell(p) - offset;

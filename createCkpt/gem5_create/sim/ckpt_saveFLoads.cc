@@ -50,6 +50,8 @@ void saveFLoads_comp(vector<FirstLoadInfo> &linfos, FILE *q)
 {
     uint64_t endaddr = 0, d1 = 0, a1 = 0, offset=0, j=0;
     uint64_t loadnum = linfos.size();
+    uint64_t compTag = 0x123456 + 2;
+    fwrite(&compTag, 8, 1, q);
     for(uint64_t i=0;i<loadnum;i++){
         endaddr = linfos[i].addr + MaxCoverSize;
 
