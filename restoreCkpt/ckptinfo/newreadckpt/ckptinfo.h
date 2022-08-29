@@ -55,7 +55,7 @@ bool setJmp(uint64_t instaddr, uint64_t target);
 void getRangeInfo(char filename[]);
 void processJmp(uint64_t npc);
 void updateJmpInst(JmpRepInfo &info);
-
+void recovery_FirstLoad(FILE *p);
 
 extern uint64_t takeOverAddr;
 extern MemRangeInfo text_seg;
@@ -132,7 +132,6 @@ extern uint64_t tempMemory[2];
     "la a0, readckpt_regs  \n\t"  \
     Context_Operation("sd x")      \
 );  
-
 
 #define Load_ReadCkptIntRegs() asm volatile( \
     "la a0, readckpt_regs \n\t"   \

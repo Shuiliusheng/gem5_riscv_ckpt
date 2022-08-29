@@ -45,6 +45,7 @@ typedef struct{
 uint64_t loadelf(char * progname, char *ckptinfo);
 void read_ckptinfo(char ckptinfo[]);
 void takeoverSyscall();
+void recovery_FirstLoad(FILE *p);
 
 extern uint64_t takeOverAddr;
 extern MemRangeInfo text_seg;
@@ -81,7 +82,6 @@ extern uint32_t JmpRTemp3Inst;  //jmp rtemp3的指令
     "la a0, readckpt_regs  \n\t"  \
     Regs_Operations("sd x")      \
 );  
-
 
 #define Load_ReadCkptIntRegs() asm volatile( \
     "la a0, readckpt_regs \n\t"   \
