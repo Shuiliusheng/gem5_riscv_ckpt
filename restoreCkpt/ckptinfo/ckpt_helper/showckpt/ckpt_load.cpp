@@ -1,13 +1,6 @@
 #include "ckptinfo.h"
 
 typedef struct{
-    uint64_t addr;
-    // uint64_t size;
-    uint64_t data;
-}LoadInfo;
-//默认均为8B
-
-typedef struct{
     uint64_t start;
     uint64_t simNum;
     uint64_t exitpc;
@@ -124,15 +117,13 @@ void read_ckptinfo(char ckptinfo[])
     printf("\n\n");
 
     //step 4: read first load information, and store these data to memory
-    uint64_t loadnum = 0;
-    fread(&loadnum, 8, 1, p);
+    vector<LoadInfo> linfos;
+    read_FirstLoad(p, linfos);
+    uint64_t loadnum = linfos.size();
     printf("--- first load num: %ld ---\n\n", loadnum);
-    LoadInfo *linfos = (LoadInfo *)malloc(sizeof(LoadInfo)*loadnum);
-    fread(&linfos[0], sizeof(LoadInfo), loadnum, p);
     // for(int i=0;i<loadnum;i++){
     //     printf("load %d: 0x%lx 0x%lx\n", i, linfos[i].addr,  linfos[i].data);
     // }
-    free(linfos);
     
     //step5: 加载syscall的执行信息到内存中
     uint64_t alloc_vaddr = read_ckptsyscall(p);

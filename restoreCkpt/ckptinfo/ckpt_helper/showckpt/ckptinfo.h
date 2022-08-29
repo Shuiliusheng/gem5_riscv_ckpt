@@ -8,6 +8,8 @@
 #include <assert.h>
 #include <stdint.h>
 #include <unistd.h>
+#include<vector>
+using namespace std;
 
 typedef struct{
     uint64_t addr;
@@ -22,9 +24,13 @@ typedef struct{
     uint64_t bufaddr, data_offset, data_size;
 }SyscallInfo;
 
+typedef struct{
+    uint64_t addr;
+    uint64_t data;
+}LoadInfo;
 
-uint64_t loadelf(char * progname);
 void read_ckptinfo(char ckptinfo[]);
+void read_FirstLoad(FILE *p, vector<LoadInfo> &tempinfos);
 
 extern MemRangeInfo text_seg;
 
