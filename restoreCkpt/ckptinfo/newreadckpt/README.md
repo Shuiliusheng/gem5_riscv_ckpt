@@ -110,6 +110,8 @@
       - （访问执行过程中访问了代码段的部分区域，如果不映射代码段所有区域，那就需要单独比较所有记录的代码区域）
     - void setFistLoad(FILE *p)
       - 从ckpt文件中读取所有的first load信息，并且将其恢复到内存中
+      - 利用fastlz中的解压缩函数，将原始数据解压
+      - 解压之后的数据格式为：addr, size, datamap, data
     - void read_ckptinfo(char ckptinfo[])
       - 主要任务：读取ckpt文件，恢复所有执行环境，完成跳转转换，启动benchmark执行
       - 读取ckpt文件的头部，获取程序片段的起始指令数，片段指令数（到退出指令为止），设置的片段长度，warmup的指令数，退出指令的pc，退出的原因，片段的第一条指令pc地址

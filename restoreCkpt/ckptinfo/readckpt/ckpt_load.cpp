@@ -1,6 +1,6 @@
 #include "ckptinfo.h"
 #include "ctrl.h"
-using namespace std;
+#include "fastlz.h"
 
 extern uint64_t _JmpRTemp3Inst;
 uint32_t JmpRTemp3Inst = *((uint32_t *)&_JmpRTemp3Inst);
@@ -45,6 +45,7 @@ void read_ckptsyscall(FILE *fp)
     SyscallInfo *sinfos = NULL;
     uint64_t infoaddr = runinfo->syscall_info_addr + 8 + runinfo->totalcallnum*4;
     uint32_t *sysidxs = (uint32_t *)(runinfo->syscall_info_addr + 8);
+
     int diffcallnum = -1;
     for(int i=0; i<runinfo->totalcallnum; i++) {
         if((int)sysidxs[i] > diffcallnum) 
@@ -73,20 +74,52 @@ void alloc_memrange(FILE *p)
     }
 }
 
+#define MaxCompressSize 1024*1024*30
+#define ExtraDataSize   1024*6
 void setFistLoad(FILE *p)
 {
     uint64_t loadnum = 0;
-    fread(&loadnum, 8, 1, p);
-    printf("--- step 4, read first load infor and init them, first load num: %d ---\n", loadnum);
-    LoadInfo *linfos = (LoadInfo *)malloc(sizeof(LoadInfo)*loadnum);
-    fread(&linfos[0], sizeof(LoadInfo), loadnum, p);
-    for(int j=0;j<loadnum;j++){
-        // printf("load %d, addr: 0x%lx, data: 0x%lx\n", j, linfos[j].addr, linfos[j].data);
-        *((uint64_t *)linfos[j].addr) = linfos[j].data;
-    }
-    free(linfos);
-}
+    uint8_t *rawdata = (uint8_t *)malloc(MaxCompressSize+ExtraDataSize);
+    uint8_t *compdata = (uint8_t *)malloc(MaxCompressSize+ExtraDataSize);
+    uint64_t compsize, rawsize, infonum = 0, baseaddr = 0;
 
+    uint8_t *cmap;
+    uint64_t mapsize = 0, addr=0, taddr=0;
+    while(1) {
+        compsize = 0, infonum = 0;
+        fread(&compsize, 8, 1, p);
+        if(compsize==0) break;
+
+        fread(&infonum, 8, 1, p);
+        fread(compdata, 1, compsize, p);
+        rawsize = fastlz_decompress(compdata, compsize, rawdata, MaxCompressSize+ExtraDataSize);
+        printf("rawsize: %d, compsize: %d, infonum: %d\n", rawsize, compsize, infonum);
+        baseaddr = (uint64_t)rawdata;
+        for(int n=0; n<infonum; n++) {
+            addr = *((uint64_t *)baseaddr);
+            if(addr==0) break;
+            baseaddr += 8;
+            mapsize = *((uint64_t *)baseaddr) / 64;
+            baseaddr+=8;
+            cmap = (uint8_t *)baseaddr;
+            baseaddr += mapsize;
+            for(int i=0;i<mapsize;i++) {
+                taddr = addr + (i*8*8);
+                for(int m=0; m<8; m++) {
+                    if(cmap[i]%2==1) {
+                        *((uint64_t *)(taddr + m*8)) = *((uint64_t *)baseaddr);
+                        baseaddr+=8;
+                        loadnum++;
+                    }
+                    cmap[i] = cmap[i] >> 1;
+                }
+            }
+        }
+    }
+    free(rawdata);
+    free(compdata);
+    printf("--- step 4, read first load infor and init them, first load num: %d ---\n", loadnum);
+}
 
 void read_ckptinfo(char ckptinfo[])
 {
