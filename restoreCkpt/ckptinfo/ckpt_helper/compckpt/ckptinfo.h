@@ -8,6 +8,8 @@
 #include <assert.h>
 #include <stdint.h>
 #include <unistd.h>
+#include<vector>
+using namespace std;
 
 typedef struct{
     uint64_t addr;
@@ -21,6 +23,9 @@ typedef struct{
 //默认均为8B
 
 void read_ckptinfo(char ckptname[], char newckptname[]);
-void compress_FirstLoad(LoadInfo *linfos, uint64_t loadnum, FILE *q);
+void compress_FirstLoad(vector<LoadInfo> &linfos, FILE *q);
 void recovery_FirstLoad(FILE *p);
+void read_FirstLoad(FILE *p, vector<LoadInfo> &tempinfos);
+
+extern int compress_choice;
 #endif

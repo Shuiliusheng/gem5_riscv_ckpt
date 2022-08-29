@@ -67,12 +67,18 @@ void read_ckptinfo(char ckptname[], char newckptname[])
     }
 
     //step 4: read first load information, and store these data to memory
-    uint64_t loadnum = 0;
-    fread(&loadnum, 8, 1, p);
-    LoadInfo *linfos = (LoadInfo *)malloc(sizeof(LoadInfo)*loadnum);
-    fread(&linfos[0], sizeof(LoadInfo), loadnum, p);
-    compress_FirstLoad(linfos, loadnum, q);
-    free(linfos);
+    vector<LoadInfo> linfos;
+    read_FirstLoad(p, linfos);
+    if(compress_choice == 0) {
+        uint64_t loadnum = linfos.size();
+        fwrite(&loadnum, 8, 1, q);
+        for(int i=0;i<loadnum;i++){
+            fwrite(&linfos[i], sizeof(LoadInfo), 1, q);
+        }
+    }
+    else{
+        compress_FirstLoad(linfos, q);
+    }
     
     uint64_t alloc_vaddr = read_ckptsyscall(p, q);
     fclose(p);
