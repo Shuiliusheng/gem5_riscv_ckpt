@@ -2,12 +2,22 @@
 
 extern uint64_t __takeOverSys_Addr;
 uint64_t takeOverAddr = (uint64_t)&__takeOverSys_Addr;
+uint64_t counters[16];
+
+#define SetProcTag(tag) asm volatile( \
+    "mv t0, %[value]    \n\t"  \
+    Set_ProcTag("t0")  \
+    : :[value]"r"(tag)  \
+); 
+
 
 void takeoverSyscall()
 {
     asm volatile("__takeOverSys_Addr: ");
     Save_ProgramIntRegs();
     Load_ReadCkptIntRegs();
+    uint64_t tag = 0;
+    SetProcTag(tag);
 
     RunningInfo *runinfo = (RunningInfo *)&runningInfo;
     uint64_t cycles = 0, insts = 0;
@@ -54,7 +64,7 @@ void takeoverSyscall()
 
     runinfo->nowcallnum ++;
 
-    if(runinfo->nowcallnum == runinfo->totalcallnum && runinfo->exit_cause == Cause_ExitInst) {
+    if(runinfo->nowcallnum == runinfo->totalcallnum && runinfo->exit_cause == Cause_ExitInst && runinfo->exitpc!=0) {
         printf("--- exit the last syscall %d, and replace exit pc (0x%lx) with jmp3 ---\n", runinfo->nowcallnum, runinfo->exitpc);
         *((uint32_t *)runinfo->exitpc) = JmpRTemp3Inst;
 	    asm volatile("fence.i  ");
@@ -65,6 +75,9 @@ void takeoverSyscall()
 
     runinfo->lastcycles = read_csr_cycle();
     runinfo->lastinsts = read_csr_instret();
+
+    tag = 0x1234567;
+    SetProcTag(tag);
 
     Load_ProgramIntRegs();
     JmpTempReg(2);

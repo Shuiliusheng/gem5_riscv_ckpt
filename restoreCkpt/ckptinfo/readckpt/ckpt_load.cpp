@@ -121,7 +121,7 @@ void read_ckptinfo(char ckptinfo[])
     read_ckptsyscall(p);
 
     //try to replace exit inst if syscall totalnum == 0
-    if(runinfo->totalcallnum == 0 && runinfo->exit_cause == Cause_ExitInst) {
+    if(runinfo->totalcallnum == 0 && runinfo->exit_cause == Cause_ExitInst && runinfo->exitpc!=0) {
         printf("--- step 5.1, syscall is zero, replace exitinst with jmp rtemp3 ---: 0x%lx\n", JmpRTemp3Inst);
         *((uint32_t *)runinfo->exitpc) = JmpRTemp3Inst; //(ECall_Replace)
     }
