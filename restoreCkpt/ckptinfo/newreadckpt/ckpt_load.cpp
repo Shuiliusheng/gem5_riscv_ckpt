@@ -47,6 +47,7 @@ void alloc_memrange(FILE *p)
     for(int i=0;i<mrange_num;i++){
         fread(&memrange, sizeof(MemRangeInfo), 1, p);
         if(memrange.size !=0){
+            memrange.size = memrange.size + 4096;
             int* arr = static_cast<int*>(mmap((void *)memrange.addr, memrange.size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, 0, 0));
             if(memrange.addr != (uint64_t)arr)
                 printf("map range: (0x%lx, 0x%lx), mapped addr: 0x%lx\n", memrange.addr, memrange.addr + memrange.size, arr);
