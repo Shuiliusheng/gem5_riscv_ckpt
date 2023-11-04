@@ -54,8 +54,13 @@ namespace gem5
 
 namespace RiscvISA
 {
-
+#define Support_ReadCkpt_TempRegs 0
+#ifndef Support_ReadCkpt_TempRegs
 const int NumIntArchRegs = 32;
+#else
+const int NumIntArchRegs = 32 + 4; //support 4 temp register
+#endif
+
 const int NumMicroIntRegs = 1;
 const int NumIntRegs = NumIntArchRegs + NumMicroIntRegs;
 
