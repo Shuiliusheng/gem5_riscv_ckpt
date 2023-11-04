@@ -66,6 +66,7 @@
 #include "sim/syscall_desc.hh"
 #include "sim/system.hh"
 #include "sim/ckpt_collect.hh"
+#include "sim/trace_collect.hh"
 #include <iostream>
 using namespace std;
 namespace gem5
@@ -162,6 +163,9 @@ Process::Process(const ProcessParams &params, EmulationPageTable *pTable,
 
     if (loader::debugSymbolTable.empty())
         loader::debugSymbolTable = objFile->symtab();
+
+    init_trace_settings(params.tracesetting.c_str());
+    cout <<"params.tracesetting:"<<params.tracesetting<<endl;
 
     //RISCV_Ckpt_Support: read ckpt settings file to config different parameters
     init_ckpt_settings(params.ckptsetting.c_str());
