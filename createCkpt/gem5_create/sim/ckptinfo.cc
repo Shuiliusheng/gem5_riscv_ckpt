@@ -397,9 +397,9 @@ void CkptInfo::saveDetailInfo()
 {
   char dstname[300];
   if(readCkptSetting)
-    sprintf(dstname, "%s_ninfor_%ld_len_%d_warmup_%d.txt", this->filename, ckptstartnum + this->startnum + this->warmup, length, warmup);
+    sprintf(dstname, "%s_ninfor_%ld_len_%ld_warmup_%d.txt", this->filename, ckptstartnum + this->startnum + this->warmup, length, warmup);
   else
-    sprintf(dstname, "%s_infor_%ld_len_%d_warmup_%d.txt", this->filename, this->startnum + this->warmup, length, warmup);
+    sprintf(dstname, "%s_infor_%ld_len_%ld_warmup_%d.txt", this->filename, this->startnum + this->warmup, length, warmup);
 
   FILE *p=NULL;
   p = fopen(dstname, "w");
@@ -453,9 +453,9 @@ void CkptInfo::saveCkptInfo()
 {
   char dstname[300];
   if(readCkptSetting)
-    sprintf(dstname, "%s_nckpt_%ld_len_%d_warmup_%d.info", this->filename, ckptstartnum + this->startnum + this->warmup, length, warmup);
+    sprintf(dstname, "%s_nckpt_%ld_len_%ld_warmup_%ld.info", this->filename, ckptstartnum + this->startnum + this->warmup, length, warmup);
   else
-    sprintf(dstname, "%s_ckpt_%ld_len_%d_warmup_%d.info", this->filename, this->startnum + this->warmup, length, warmup);
+    sprintf(dstname, "%s_ckpt_%ld_len_%ld_warmup_%ld.info", this->filename, this->startnum + this->warmup, length, warmup);
 
   FILE *p=NULL;
   p = fopen(dstname, "wb");

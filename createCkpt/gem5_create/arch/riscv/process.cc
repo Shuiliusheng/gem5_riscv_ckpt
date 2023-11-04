@@ -89,9 +89,11 @@ RiscvProcess64::RiscvProcess64(const ProcessParams &params,
         if(ckptsettings.brk_point < temp_brk_point) {
             for(int i=0;i<3;i++)
                 printf("Note: The program raw brk_point: 0x%lx, is bigger than the setting brk: 0x%lx. (!!!)\n\n", temp_brk_point, ckptsettings.brk_point);
-            exit(0);
+            // exit(0);
+            temp_brk_point = roundUp(image.maxAddr(), PageBytes);
         }
-        temp_brk_point = roundUp(ckptsettings.brk_point, PageBytes);
+        else
+            temp_brk_point = roundUp(ckptsettings.brk_point, PageBytes);
     }
     else
         ckptsettings.brk_point = temp_brk_point;
