@@ -66,6 +66,7 @@ class Process(SimObject):
     stackbase = Param.UInt64(0x7FFFFFFF, 'simulation stack base of program')
     mmapend = Param.UInt64(0x41000000, 'simulation the mmap addr end place')
     ckptsetting = Param.String('', 'simulation the mmap addr end place')
+    tracesetting = Param.String('', 'simulation the mmap addr end place')
 
 
     @classmethod

@@ -90,6 +90,7 @@ Source('ckpt_collect.cc')
 Source('ckptinfo.cc')
 Source('fastlz.cc')
 Source('ckpt_saveFLoads.cc')
+Source('trace_collect.cc')
 
 GTest('byteswap.test', 'byteswap.test.cc', '../base/types.cc')
 GTest('guest_abi.test', 'guest_abi.test.cc')

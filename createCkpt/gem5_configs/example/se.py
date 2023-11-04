@@ -114,6 +114,9 @@ def get_processes(args):
         if '--ckptsetting' in str(sys.argv):
             process.ckptsetting = args.ckptsetting
 
+        if '--tracesetting' in str(sys.argv):
+            process.tracesetting = args.tracesetting
+
         multiprocesses.append(process)
         idx += 1
 

@@ -57,6 +57,7 @@
 #include "sim/faults.hh"
 #include "sim/full_system.hh"
 #include "sim/system.hh"
+#include "sim/trace_collect.hh"
 #include <string.h>
 namespace gem5
 {
@@ -432,6 +433,11 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t *data, unsigned size,
                 assert(!locked);
                 locked = true;
             }
+            //for creating traces
+            if(traceOpen) {
+                record_meminfo(thread->pcState().pc(), addr);
+            }
+
             //RISCV_Ckpt_Support: record load information  || (thread->pcState().pc() < 0x1000000 && showdetail) 
             if (needCreateCkpt && startlog) { 
                 ckpt_addload(addr, data, size);
@@ -477,6 +483,10 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
         // else if(size == 2) printf("0x%x\n", *((uint16_t *)data));
         // else if(size == 4) printf("0x%x\n", *((uint32_t *)data));
         // else if(size == 8) printf("0x%lx\n", *((uint64_t *)data));
+    }
+    //for creating traces
+    if(traceOpen) {
+        record_meminfo(thread->pcState().pc(), addr);
     }
 
     // use the CPU's statically allocated write request and packet objects
@@ -653,6 +663,10 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
     }
 
     //If there's a fault and we're not doing prefetch, return it
+    //for creating traces
+    if(traceOpen) {
+        record_meminfo(thread->pcState().pc(), addr);
+    }
     return fault;
 }
 
@@ -765,6 +779,11 @@ AtomicSimpleCPU::tick()
                 if (fault == NoFault) {
                     countInst();
                     ppCommit->notify(std::make_pair(thread, curStaticInst));
+
+                    //for creating traces
+                    if(traceOpen) {
+                        record_traces(thread, curStaticInst);
+                    }
 
                     //RISCV_Ckpt_Support: determine if the readckpt_new.riscv is running 
                     if(readCkptSetting) {
