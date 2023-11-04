@@ -1,0 +1,6 @@
+maxpc: 0x4000000 
+minpc: 0x200000 
+tracectrl: 0 2000000 4
+logprefix: gcc_ckpt
+ckptstart: 14999000000 
+

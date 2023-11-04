@@ -1,3 +1,24 @@
+#### create cvp traces with gem5 （riscv）
+#### 使用方法
+shell/genTraces.sh
+- tracesetting=settingsfile
+  - 指定生成traces的配置文件
+- settingsfile
+  - maxpc: 0x4000000 
+  - minpc: 0x200000 
+    - 要统计的指令pc范围
+  - tracectrl: 0 20000000 1
+  - tracectrl: 100000000 20000000 1
+    - 要通知的区域范围
+    - tracectrl: start length num
+    - 从多少条指令开始 统计多少条指令 一共多少个连续间隔
+  - ckptstart: 12400000000 
+    - 使用ckpt时的参数，指明当前ckpt的起始指令是从哪里开始的
+  - logprefix: astar  
+    - 输出文件的前缀
+
+
+#### 修改的代码
 1. configs增加tracesetting的参数设置
     - common/Options.py中增加参数
     ```python
@@ -17,16 +38,16 @@
     - sim/trace_collect.hh
     - sim/trace_collect.cc
 
-2. sim/SConscript中增加新的cc文件
+3. sim/SConscript中增加新的cc文件
     - Source('trace_collect.cc')
 
-2. sim/Process.py中的修改，增加traces的param参数
+4. sim/Process.py中的修改，增加traces的param参数
     - 增加tracesetting的参数
     ```python
         tracesetting = Param.String('', 'simulation the mmap addr end place')
     ```
 
-2. sim/process.cc中的修改，以初始化traces设置的读取
+5. sim/process.cc中的修改，以初始化traces设置的读取
     - 增加头文件：#include "sim/trace_collect.hh"
     - Process::Process函数中
     ```c
@@ -42,7 +63,7 @@
         cout <<"params.tracesetting:"<<params.tracesetting<<endl;
     ```
 
-3. cpu/simple/atomic.cc中修改，以记录指令执行时信息
+6. cpu/simple/atomic.cc中修改，以记录指令执行时信息
     - 增加头文件：#include "sim/trace_collect.hh"
     - readMem函数的修改
     ```c
